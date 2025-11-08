@@ -1,0 +1,54 @@
+{
+  "name": "agent-trading-platform",
+  "version": "1.0.0",
+  "description": "Under construction...",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon --exec tsx src/index.ts",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean",
+    "prestart": "npm run build",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "imports": {
+    "#/*": "./src/*",
+    "#types/*": "./src/types/*",
+    "#utils/*": "./src/utils/*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonathanjacka/agent-trading-platform.git"
+  },
+  "keywords": [
+    "trading",
+    "platform",
+    "typescript",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jonathanjacka/agent-trading-platform/issues"
+  },
+  "homepage": "https://github.com/jonathanjacka/agent-trading-platform#readme",
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
+    "eslint": "^9.16.0",
+    "nodemon": "^3.1.7",
+    "prettier": "^3.4.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.7.2"
+  }
+}
