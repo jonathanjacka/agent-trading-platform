@@ -44,6 +44,9 @@ jspm_packages/
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 
+# TypeScript v1 declaration files
+typings/
+
 # TypeScript cache
 *.tsbuildinfo
 
@@ -55,6 +58,12 @@ web_modules/
 
 # Optional stylelint cache
 .stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
 # Optional REPL history
 .node_repl_history
@@ -115,6 +124,11 @@ dist
 
 # DynamoDB Local files
 .dynamodb/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
 
 # Firebase cache directory
 .firebase/
