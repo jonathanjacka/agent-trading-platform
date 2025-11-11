@@ -106,3 +106,5 @@ npm run dev:test-market
 2. Test 2: `getEstimatedPrice` (0 API calls - uses cache)
 3. Test 3: `getStockNews` (1 API call)
 4. Test 4: `searchTickers` (1 API call)
+
+If some these tests do fail with `400` errors, you're hitting the rate-limit. You can also confirm this from the logs at your [Massive Dashboard.](https://massive.com/dashboard)
