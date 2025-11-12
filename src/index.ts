@@ -14,7 +14,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Initialize services
 const apiKey = process.env.POLY_API_KEY;
 if (!apiKey) {
   Logger.error('POLY_API_KEY not found in environment');
@@ -55,7 +54,6 @@ Accepts higher volatility for potentially exceptional returns.`
   Logger.success('Trader accounts initialized');
 }
 
-// Initialize accounts on startup
 await initializeAccounts();
 
 const leonardoAgent = new TraderAgent(
@@ -81,13 +79,12 @@ market sentiment, ready to take bold positions and actively manage your portfoli
   braveSearch
 );
 
-// Create traders map for easier management
+// Create traders map
 const traders = new Map<string, TraderAgent>([
   ['leonardo', leonardoAgent],
   ['michelangelo', michelangeloAgent],
 ]);
 
-// Setup routes
 const routes = createRoutes(researcherAgent, traders, accountService);
 app.use(routes);
 
