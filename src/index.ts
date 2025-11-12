@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import 'dotenv/config';
 import { TraderAgent } from './agents/TraderAgent.js';
 import { ResearcherAgent } from './agents/ResearcherAgent.js';
@@ -7,6 +7,7 @@ import { MarketDataService } from './services/MarketDataService.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
 import { DatabaseService } from './services/DatabaseService.js';
 import { AccountService } from './services/AccountService.js';
+import { createRoutes } from './routes/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -80,186 +81,15 @@ market sentiment, ready to take bold positions and actively manage your portfoli
   braveSearch
 );
 
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    agents: {
-      researcher: 'active',
-      traders: ['Leonardo', 'Michelangelo'],
-    },
-  });
-});
+// Create traders map for easier management
+const traders = new Map<string, TraderAgent>([
+  ['leonardo', leonardoAgent],
+  ['michelangelo', michelangeloAgent],
+]);
 
-// Test Researcher endpoint
-app.post('/api/research', async (req: Request, res: Response) => {
-  try {
-    const { query } = req.body;
-
-    if (!query) {
-      return res.status(400).json({ error: 'Query is required' });
-    }
-
-    Logger.info(`Received research request: ${query}`);
-
-    const result = await researcherAgent.research(query);
-
-    res.json({
-      success: true,
-      agent: 'Researcher',
-      query,
-      result,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    Logger.error('Research error', error);
-    res.status(500).json({
-      error: 'Failed to complete research',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Test Trader endpoint
-app.post('/api/trade/:traderName', async (req: Request, res: Response) => {
-  try {
-    const { traderName } = req.params;
-    const { prompt } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
-
-    let trader: TraderAgent;
-
-    if (traderName.toLowerCase() === 'leonardo') {
-      trader = leonardoAgent;
-    } else if (traderName.toLowerCase() === 'michelangelo') {
-      trader = michelangeloAgent;
-    } else {
-      return res.status(404).json({
-        error: `Trader '${traderName}' not found. Available: leonardo, michelangelo`,
-      });
-    }
-
-    Logger.info(`Received trading request for ${traderName}: ${prompt}`);
-
-    const result = await trader.trade(prompt);
-
-    res.json({
-      success: true,
-      trader: trader.getInfo(),
-      prompt,
-      result,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    Logger.error('Trading error', error);
-    res.status(500).json({
-      error: 'Failed to complete trading operation',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Get trader info
-app.get('/api/traders', (req: Request, res: Response) => {
-  res.json({
-    traders: [leonardoAgent.getInfo(), michelangeloAgent.getInfo()],
-  });
-});
-
-// Get trader portfolio
-app.get('/api/portfolio/:traderName', async (req: Request, res: Response) => {
-  try {
-    const { traderName } = req.params;
-
-    // Capitalize first letter to match database
-    const formattedName =
-      traderName.charAt(0).toUpperCase() + traderName.slice(1).toLowerCase();
-
-    const portfolio = await accountService.getPortfolio(formattedName);
-
-    res.json({
-      success: true,
-      trader: formattedName,
-      portfolio,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    Logger.error('Portfolio error', error);
-    res.status(500).json({
-      error: 'Failed to get portfolio',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Get trader transaction history
-app.get(
-  '/api/transactions/:traderName',
-  async (req: Request, res: Response) => {
-    try {
-      const { traderName } = req.params;
-      const limit = parseInt(req.query.limit as string) || 50;
-
-      // Capitalize first letter to match database
-      const formattedName =
-        traderName.charAt(0).toUpperCase() + traderName.slice(1).toLowerCase();
-
-      const transactions = accountService.getTransactionHistory(
-        formattedName,
-        limit
-      );
-
-      res.json({
-        success: true,
-        trader: formattedName,
-        transactions,
-        count: transactions.length,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      Logger.error('Transaction history error', error);
-      res.status(500).json({
-        error: 'Failed to get transaction history',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
-);
-
-// Get portfolio value history
-app.get(
-  '/api/portfolio-history/:traderName',
-  async (req: Request, res: Response) => {
-    try {
-      const { traderName } = req.params;
-      const limit = parseInt(req.query.limit as string) || 100;
-
-      // Capitalize first letter to match database
-      const formattedName =
-        traderName.charAt(0).toUpperCase() + traderName.slice(1).toLowerCase();
-
-      const history = accountService.getPortfolioHistory(formattedName, limit);
-
-      res.json({
-        success: true,
-        trader: formattedName,
-        history,
-        count: history.length,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      Logger.error('Portfolio history error', error);
-      res.status(500).json({
-        error: 'Failed to get portfolio history',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
-);
+// Setup routes
+const routes = createRoutes(researcherAgent, traders, accountService);
+app.use(routes);
 
 app.listen(PORT, () => {
   Logger.section('Trading Platform Server');
