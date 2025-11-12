@@ -50,7 +50,7 @@ function App() {
       <header className='bg-white shadow-sm border-b'>
         <div className='max-w-[1920px] mx-auto px-6 py-6'>
           <h1 className='text-3xl font-bold text-gray-900'>
-            🐢 TMNT Trading Platform
+            ACME Trading Platform
           </h1>
           <p className='text-gray-600 mt-1'>AI-Powered Autonomous Traders</p>
         </div>
@@ -71,8 +71,7 @@ function App() {
       <footer className='bg-white border-t mt-12'>
         <div className='max-w-[1920px] mx-auto px-6 py-4'>
           <p className='text-center text-gray-500 text-sm'>
-            Real-time portfolio updates every 30 seconds • Powered by Claude 3.5
-            Sonnet
+            Real-time portfolio updates every 30 seconds
           </p>
         </div>
       </footer>
