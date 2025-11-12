@@ -5,6 +5,7 @@ import { ResearcherAgent } from './ResearcherAgent.js';
 import { Logger } from '../utils/logger.js';
 import { MarketDataService } from '../services/MarketDataService.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
+import { AccountService } from '../services/AccountService.js';
 
 export class TraderAgent {
   private modelName: string;
@@ -12,15 +13,12 @@ export class TraderAgent {
   private strategy: string;
   private instructions: string;
   private researcherAgent: ResearcherAgent;
-  private marketData: MarketDataService;
-  private portfolio: {
-    cash: number;
-    holdings: Record<string, { shares: number; avgPrice: number }>;
-  };
+  private accountService: AccountService;
 
   constructor(
     name: string,
     strategy: string,
+    accountService: AccountService,
     marketData: MarketDataService,
     braveSearch: BraveSearchService,
     modelName: string = process.env.DEFAULT_MODEL || 'gpt-4o-mini'
@@ -28,21 +26,12 @@ export class TraderAgent {
     this.name = name;
     this.strategy = strategy;
     this.modelName = modelName;
-    this.marketData = marketData;
+    this.accountService = accountService;
     this.researcherAgent = new ResearcherAgent(
       marketData,
       braveSearch,
       modelName
     );
-
-    // Initialize portfolio (mock data for now, will be database-backed later)
-    this.portfolio = {
-      cash: 10000,
-      holdings: {
-        AAPL: { shares: 10, avgPrice: 150 },
-        MSFT: { shares: 5, avgPrice: 300 },
-      },
-    };
 
     this.instructions = `You are ${this.name}, an autonomous stock trader.
 
@@ -81,61 +70,23 @@ Current datetime: ${new Date().toISOString()}`;
         execute: async () => {
           Logger.portfolio(this.name, 'Checking portfolio');
 
-          // Calculate real-time portfolio value using current prices
-          const holdingsWithValues = await Promise.all(
-            Object.entries(this.portfolio.holdings).map(
-              async ([symbol, holding]) => {
-                try {
-                  const priceData =
-                    await this.marketData.getEstimatedPrice(symbol);
-                  const currentValue =
-                    priceData.estimatedPrice * holding.shares;
-                  const costBasis = holding.avgPrice * holding.shares;
-                  const gainLoss = currentValue - costBasis;
-                  const gainLossPercent = (
-                    (gainLoss / costBasis) *
-                    100
-                  ).toFixed(2);
-
-                  return {
-                    symbol,
-                    shares: holding.shares,
-                    avgPrice: holding.avgPrice,
-                    currentPrice: priceData.estimatedPrice,
-                    currentValue,
-                    gainLoss,
-                    gainLossPercent: `${gainLossPercent}%`,
-                  };
-                } catch (error) {
-                  Logger.warn(
-                    `Failed to get price for ${symbol}, using avg price`
-                  );
-                  return {
-                    symbol,
-                    shares: holding.shares,
-                    avgPrice: holding.avgPrice,
-                    currentPrice: holding.avgPrice,
-                    currentValue: holding.avgPrice * holding.shares,
-                    gainLoss: 0,
-                    gainLossPercent: '0%',
-                  };
-                }
-              }
-            )
-          );
-
-          const totalHoldingsValue = holdingsWithValues.reduce(
-            (sum, h) => sum + h.currentValue,
-            0
-          );
-          const totalValue = totalHoldingsValue + this.portfolio.cash;
+          const portfolio = await this.accountService.getPortfolio(this.name);
 
           return {
-            cash: this.portfolio.cash,
-            holdings: holdingsWithValues,
-            totalHoldingsValue,
-            totalValue,
-            note: 'Prices are estimated from market cap, updated daily',
+            cash: portfolio.cash,
+            holdings: portfolio.holdings.map((h) => ({
+              symbol: h.symbol,
+              shares: h.quantity,
+              avgPrice: h.avgPrice,
+              currentPrice: h.currentPrice,
+              currentValue: h.currentValue,
+              gain: h.gain,
+              gainPercent: `${h.gainPercent.toFixed(2)}%`,
+            })),
+            totalHoldingsValue: portfolio.totalHoldingsValue,
+            totalValue: portfolio.totalValue,
+            totalGain: portfolio.totalGain,
+            totalGainPercent: `${portfolio.totalGainPercent.toFixed(2)}%`,
           };
         },
       }),
@@ -151,18 +102,20 @@ Current datetime: ${new Date().toISOString()}`;
             .describe('Reason for buying, aligned with your strategy'),
         }),
         execute: async ({ symbol, quantity, rationale }) => {
-          Logger.buyOrder(this.name, quantity, symbol, rationale);
-
-          const mockPrice = 150 + Math.random() * 50;
-          return {
-            status: 'executed',
+          const result = await this.accountService.buyStock(
+            this.name,
             symbol,
             quantity,
-            price: mockPrice,
-            total: mockPrice * quantity,
-            rationale,
-            timestamp: new Date().toISOString(),
-          };
+            rationale
+          );
+
+          if (!result.success) {
+            Logger.warn(`Buy order failed: ${result.message}`);
+          } else {
+            await this.accountService.recordPortfolioSnapshot(this.name);
+          }
+
+          return result;
         },
       }),
 
@@ -177,18 +130,20 @@ Current datetime: ${new Date().toISOString()}`;
             .describe('Reason for selling, aligned with your strategy'),
         }),
         execute: async ({ symbol, quantity, rationale }) => {
-          Logger.sellOrder(this.name, quantity, symbol, rationale);
-
-          const mockPrice = 150 + Math.random() * 50;
-          return {
-            status: 'executed',
+          const result = await this.accountService.sellStock(
+            this.name,
             symbol,
             quantity,
-            price: mockPrice,
-            total: mockPrice * quantity,
-            rationale,
-            timestamp: new Date().toISOString(),
-          };
+            rationale
+          );
+
+          if (!result.success) {
+            Logger.warn(`Sell order failed: ${result.message}`);
+          } else {
+            await this.accountService.recordPortfolioSnapshot(this.name);
+          }
+
+          return result;
         },
       }),
     };
