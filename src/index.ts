@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import 'dotenv/config';
 import { TraderAgent } from './agents/TraderAgent.js';
 import { ResearcherAgent } from './agents/ResearcherAgent.js';
@@ -11,6 +12,13 @@ import { createRoutes } from './routes/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(
+  cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
