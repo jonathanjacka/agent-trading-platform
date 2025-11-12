@@ -5,6 +5,8 @@ import { ResearcherAgent } from './agents/ResearcherAgent.js';
 import { Logger } from './utils/logger.js';
 import { MarketDataService } from './services/MarketDataService.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
+import { DatabaseService } from './services/DatabaseService.js';
+import { AccountService } from './services/AccountService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,7 +28,34 @@ if (!braveApiKey) {
 
 const marketData = new MarketDataService(apiKey);
 const braveSearch = new BraveSearchService(braveApiKey);
+const db = DatabaseService.getInstance();
+const accountService = new AccountService(db, marketData);
 const researcherAgent = new ResearcherAgent(marketData, braveSearch);
+
+async function initializeAccounts() {
+  const initialBalance = 50000; // $50k starting balance
+
+  await accountService.initializeAccount(
+    'Leonardo',
+    initialBalance,
+    `Value-oriented investor who prioritizes long-term wealth creation.
+Identifies high-quality companies trading below their intrinsic value.
+Invests patiently and holds positions through market fluctuations.`
+  );
+
+  await accountService.initializeAccount(
+    'Michelangelo',
+    initialBalance,
+    `Aggressively pursues opportunities in disruptive innovation, particularly in technology.
+Identifies and invests boldly in sectors poised to revolutionize the economy.
+Accepts higher volatility for potentially exceptional returns.`
+  );
+
+  Logger.success('Trader accounts initialized');
+}
+
+// Initialize accounts on startup
+await initializeAccounts();
 
 const leonardoAgent = new TraderAgent(
   'Leonardo',
@@ -35,6 +64,7 @@ You identify high-quality companies trading below their intrinsic value.
 You invest patiently and hold positions through market fluctuations, 
 relying on meticulous fundamental analysis, steady cash flows, strong management teams, 
 and competitive advantages. You rarely react to short-term market movements.`,
+  accountService,
   marketData,
   braveSearch
 );
@@ -45,6 +75,7 @@ const michelangeloAgent = new TraderAgent(
 Your strategy is to identify and invest boldly in sectors poised to revolutionize the economy, 
 accepting higher volatility for potentially exceptional returns. You closely monitor technological breakthroughs, 
 market sentiment, ready to take bold positions and actively manage your portfolio to capitalize on growth trends.`,
+  accountService,
   marketData,
   braveSearch
 );
@@ -138,6 +169,97 @@ app.get('/api/traders', (req: Request, res: Response) => {
     traders: [leonardoAgent.getInfo(), michelangeloAgent.getInfo()],
   });
 });
+
+// Get trader portfolio
+app.get('/api/portfolio/:traderName', async (req: Request, res: Response) => {
+  try {
+    const { traderName } = req.params;
+
+    // Capitalize first letter to match database
+    const formattedName =
+      traderName.charAt(0).toUpperCase() + traderName.slice(1).toLowerCase();
+
+    const portfolio = await accountService.getPortfolio(formattedName);
+
+    res.json({
+      success: true,
+      trader: formattedName,
+      portfolio,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    Logger.error('Portfolio error', error);
+    res.status(500).json({
+      error: 'Failed to get portfolio',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get trader transaction history
+app.get(
+  '/api/transactions/:traderName',
+  async (req: Request, res: Response) => {
+    try {
+      const { traderName } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      // Capitalize first letter to match database
+      const formattedName =
+        traderName.charAt(0).toUpperCase() + traderName.slice(1).toLowerCase();
+
+      const transactions = accountService.getTransactionHistory(
+        formattedName,
+        limit
+      );
+
+      res.json({
+        success: true,
+        trader: formattedName,
+        transactions,
+        count: transactions.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      Logger.error('Transaction history error', error);
+      res.status(500).json({
+        error: 'Failed to get transaction history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+);
+
+// Get portfolio value history
+app.get(
+  '/api/portfolio-history/:traderName',
+  async (req: Request, res: Response) => {
+    try {
+      const { traderName } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      // Capitalize first letter to match database
+      const formattedName =
+        traderName.charAt(0).toUpperCase() + traderName.slice(1).toLowerCase();
+
+      const history = accountService.getPortfolioHistory(formattedName, limit);
+
+      res.json({
+        success: true,
+        trader: formattedName,
+        history,
+        count: history.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      Logger.error('Portfolio history error', error);
+      res.status(500).json({
+        error: 'Failed to get portfolio history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+);
 
 app.listen(PORT, () => {
   Logger.section('Trading Platform Server');
