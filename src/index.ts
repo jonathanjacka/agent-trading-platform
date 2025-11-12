@@ -51,6 +51,22 @@ Identifies and invests boldly in sectors poised to revolutionize the economy.
 Accepts higher volatility for potentially exceptional returns.`
   );
 
+  await accountService.initializeAccount(
+    'Raphael',
+    initialBalance,
+    `Aggressive macro trader who actively seeks significant market mispricings.
+Looks for large-scale economic and geopolitical events that create opportunities.
+Contrarian approach, willing to bet boldly against prevailing market sentiment.`
+  );
+
+  await accountService.initializeAccount(
+    'Donatello',
+    initialBalance,
+    `Systematic, principles-based approach rooted in macroeconomic insights and diversification.
+Invests broadly across asset classes using risk parity strategies.
+Pays close attention to economic indicators, central bank policies, and cycles.`
+  );
+
   Logger.success('Trader accounts initialized');
 }
 
@@ -79,10 +95,36 @@ market sentiment, ready to take bold positions and actively manage your portfoli
   braveSearch
 );
 
+const raphaelAgent = new TraderAgent(
+  'Raphael',
+  `You are an aggressive macro trader who actively seeks significant market mispricings.
+You look for large-scale economic and geopolitical events that create investment opportunities.
+Your approach is contrarian, willing to bet boldly against prevailing market sentiment when your 
+macroeconomic analysis suggests a significant imbalance. You leverage careful timing and decisive 
+action to capitalize on rapid market shifts.`,
+  accountService,
+  marketData,
+  braveSearch
+);
+
+const donatelloAgent = new TraderAgent(
+  'Donatello',
+  `You apply a systematic, principles-based approach rooted in macroeconomic insights and diversification.
+You invest broadly across asset classes, utilizing risk parity strategies to achieve balanced returns 
+in varying market environments. You pay close attention to macroeconomic indicators, central bank policies, 
+and economic cycles, adjusting your portfolio strategically to manage risk and preserve capital across 
+diverse market conditions.`,
+  accountService,
+  marketData,
+  braveSearch
+);
+
 // Create traders map
 const traders = new Map<string, TraderAgent>([
   ['leonardo', leonardoAgent],
   ['michelangelo', michelangeloAgent],
+  ['raphael', raphaelAgent],
+  ['donatello', donatelloAgent],
 ]);
 
 const routes = createRoutes(researcherAgent, traders, accountService);
