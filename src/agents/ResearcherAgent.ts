@@ -3,37 +3,49 @@ import { z } from 'zod';
 import { openai } from '@ai-sdk/openai';
 import { Logger } from '../utils/logger.js';
 import { MarketDataService } from '../services/MarketDataService.js';
+import { BraveSearchService } from '../services/BraveSearchService.js';
 
 export class ResearcherAgent {
   private modelName: string;
   private instructions: string;
   private marketData: MarketDataService;
+  private braveSearch: BraveSearchService;
 
   constructor(
     marketData: MarketDataService,
+    braveSearch: BraveSearchService,
     modelName: string = process.env.DEFAULT_MODEL || 'gpt-4o-mini'
   ) {
     this.modelName = modelName;
     this.marketData = marketData;
+    this.braveSearch = braveSearch;
     this.instructions = `You are a financial researcher with expertise in market analysis.
 Your role is to:
 - Search for and analyze financial news and market information
+- Research broader market context and industry trends
 - Identify trading opportunities and risks
 - Provide clear, concise summaries of your findings
 - Focus on factual information and avoid speculation
 
+Available tools:
+- searchFinancialNews: Get stock-specific news with AI sentiment analysis
+- analyzeCompany: Get company fundamentals and financial details
+- searchWeb: Research general market context, industry trends, economic news
+
 When researching:
-1. Look for recent news and developments
-2. Consider multiple perspectives
-3. Highlight key facts that could impact trading decisions
-4. Be concise but thorough
+1. Use searchFinancialNews for stock-specific news and sentiment
+2. Use analyzeCompany for company fundamentals and valuation
+3. Use searchWeb for broader context (industry trends, competitors, economic factors)
+4. Consider multiple perspectives and sources
+5. Highlight key facts that could impact trading decisions
+6. Be concise but thorough
 
 Current datetime: ${new Date().toISOString()}`;
   }
 
   private getTools() {
     return {
-      searchWeb: tool({
+      searchFinancialNews: tool({
         description:
           'Search for recent financial news about a stock. Returns articles with sentiment analysis.',
         inputSchema: z.object({
@@ -77,6 +89,81 @@ Current datetime: ${new Date().toISOString()}`;
             return {
               results: [],
               summary: `Error fetching news for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            };
+          }
+        },
+      }),
+      searchWeb: tool({
+        description:
+          'Search the web for general market information, industry trends, competitor analysis, or economic news. Use this for broader context beyond stock-specific news.',
+        inputSchema: z.object({
+          query: z
+            .string()
+            .describe(
+              'The search query (e.g., "AI chip industry trends", "Federal Reserve interest rate policy")'
+            ),
+          count: z
+            .number()
+            .optional()
+            .default(5)
+            .describe('Number of results to retrieve (default 5)'),
+          freshness: z
+            .enum(['pd', 'pw', 'pm', 'py'])
+            .optional()
+            .describe(
+              'Time filter: pd=past day, pw=past week, pm=past month, py=past year'
+            ),
+        }),
+        execute: async ({ query, count, freshness }) => {
+          Logger.search(`Web: "${query}" (count: ${count})`);
+
+          try {
+            const results = await this.braveSearch.search(query, {
+              count,
+              freshness,
+            });
+
+            const webResults = results.web?.results || [];
+            const newsResults = results.news?.results || [];
+
+            if (webResults.length === 0 && newsResults.length === 0) {
+              return {
+                results: [],
+                summary: `No results found for "${query}"`,
+              };
+            }
+
+            const combined = [
+              ...webResults.map((r) => ({
+                title: r.title,
+                description: r.description,
+                url: r.url,
+                type: 'web' as const,
+                age: r.age,
+              })),
+              ...newsResults.map((r) => ({
+                title: r.title,
+                description: r.description,
+                url: r.url,
+                type: 'news' as const,
+                source: r.source,
+                age: r.age,
+                breaking: r.breaking,
+              })),
+            ];
+
+            return {
+              results: combined,
+              summary: `Found ${webResults.length} web results and ${newsResults.length} news articles for "${query}"`,
+              queryAltered: results.query.altered
+                ? `Query was corrected to: "${results.query.altered}"`
+                : undefined,
+            };
+          } catch (error) {
+            Logger.error(`Failed to search web for "${query}"`, error);
+            return {
+              results: [],
+              summary: `Error searching web: ${error instanceof Error ? error.message : 'Unknown error'}`,
             };
           }
         },

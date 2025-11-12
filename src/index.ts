@@ -4,21 +4,29 @@ import { TraderAgent } from './agents/TraderAgent.js';
 import { ResearcherAgent } from './agents/ResearcherAgent.js';
 import { Logger } from './utils/logger.js';
 import { MarketDataService } from './services/MarketDataService.js';
+import { BraveSearchService } from './services/BraveSearchService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Initialize MarketDataService
+// Initialize services
 const apiKey = process.env.POLY_API_KEY;
 if (!apiKey) {
   Logger.error('POLY_API_KEY not found in environment');
   process.exit(1);
 }
 
+const braveApiKey = process.env.BRAVE_API_KEY;
+if (!braveApiKey) {
+  Logger.error('BRAVE_API_KEY not found in environment');
+  process.exit(1);
+}
+
 const marketData = new MarketDataService(apiKey);
-const researcherAgent = new ResearcherAgent(marketData);
+const braveSearch = new BraveSearchService(braveApiKey);
+const researcherAgent = new ResearcherAgent(marketData, braveSearch);
 
 const leonardoAgent = new TraderAgent(
   'Leonardo',
@@ -27,7 +35,8 @@ You identify high-quality companies trading below their intrinsic value.
 You invest patiently and hold positions through market fluctuations, 
 relying on meticulous fundamental analysis, steady cash flows, strong management teams, 
 and competitive advantages. You rarely react to short-term market movements.`,
-  marketData
+  marketData,
+  braveSearch
 );
 
 const michelangeloAgent = new TraderAgent(
@@ -36,7 +45,8 @@ const michelangeloAgent = new TraderAgent(
 Your strategy is to identify and invest boldly in sectors poised to revolutionize the economy, 
 accepting higher volatility for potentially exceptional returns. You closely monitor technological breakthroughs, 
 market sentiment, ready to take bold positions and actively manage your portfolio to capitalize on growth trends.`,
-  marketData
+  marketData,
+  braveSearch
 );
 
 // Health check endpoint

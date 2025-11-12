@@ -4,6 +4,7 @@ import { openai } from '@ai-sdk/openai';
 import { ResearcherAgent } from './ResearcherAgent.js';
 import { Logger } from '../utils/logger.js';
 import { MarketDataService } from '../services/MarketDataService.js';
+import { BraveSearchService } from '../services/BraveSearchService.js';
 
 export class TraderAgent {
   private modelName: string;
@@ -21,13 +22,18 @@ export class TraderAgent {
     name: string,
     strategy: string,
     marketData: MarketDataService,
+    braveSearch: BraveSearchService,
     modelName: string = process.env.DEFAULT_MODEL || 'gpt-4o-mini'
   ) {
     this.name = name;
     this.strategy = strategy;
     this.modelName = modelName;
     this.marketData = marketData;
-    this.researcherAgent = new ResearcherAgent(marketData, modelName);
+    this.researcherAgent = new ResearcherAgent(
+      marketData,
+      braveSearch,
+      modelName
+    );
 
     // Initialize portfolio (mock data for now, will be database-backed later)
     this.portfolio = {
