@@ -1,15 +1,17 @@
 import { useTraders } from './hooks';
-import { TraderCard } from './components';
+import { TraderCard } from './components/TraderCard';
+import { ThemeToggle } from './components/ThemeToggle';
+import { Footer } from './components/Footer';
 
 function App() {
   const { data: traders, isLoading, error } = useTraders();
 
   if (isLoading) {
     return (
-      <div className='min-h-screen bg-gray-100 flex items-center justify-center'>
+      <div className='min-h-screen bg-base-200 flex items-center justify-center'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto'></div>
-          <p className='mt-4 text-gray-600 text-lg'>Loading traders...</p>
+          <span className='loading loading-spinner loading-lg text-primary'></span>
+          <p className='mt-4 text-base-content text-lg'>Loading traders...</p>
         </div>
       </div>
     );
@@ -17,64 +19,58 @@ function App() {
 
   if (error) {
     return (
-      <div className='min-h-screen bg-gray-100 flex items-center justify-center'>
-        <div className='bg-white rounded-lg shadow-lg p-8 max-w-md'>
-          <div className='text-red-500 mb-4'>
-            <svg
-              className='h-12 w-12 mx-auto'
-              fill='currentColor'
-              viewBox='0 0 20 20'
-            >
-              <path
-                fillRule='evenodd'
-                d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
-                clipRule='evenodd'
-              />
-            </svg>
+      <div className='min-h-screen bg-base-200 flex items-center justify-center'>
+        <div className='alert alert-error max-w-md shadow-lg'>
+          <svg
+            xmlns='http://www.w3.org/2000/svg'
+            className='stroke-current shrink-0 h-6 w-6'
+            fill='none'
+            viewBox='0 0 24 24'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth='2'
+              d='M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+            />
+          </svg>
+          <div>
+            <h3 className='font-bold'>Connection Error</h3>
+            <div className='text-sm'>
+              Unable to connect to the trading platform. Make sure the backend
+              server is running on port 3000.
+            </div>
           </div>
-          <h2 className='text-xl font-bold text-gray-900 mb-2 text-center'>
-            Connection Error
-          </h2>
-          <p className='text-gray-600 text-center'>
-            Unable to connect to the trading platform. Make sure the backend
-            server is running on port 3000.
-          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className='min-h-screen bg-gray-100'>
-      {/* Header */}
-      <header className='bg-white shadow-sm border-b'>
-        <div className='max-w-[1920px] mx-auto px-6 py-6'>
-          <h1 className='text-3xl font-bold text-gray-900'>
-            ACME Trading Platform
-          </h1>
-          <p className='text-gray-600 mt-1'>AI-Powered Autonomous Traders</p>
+    <div className='min-h-screen bg-base-200'>
+      <div className='navbar bg-base-100 shadow-lg'>
+        <div className='navbar-start'></div>
+        <div className='navbar-center'>
+          <h1 className='text-xl font-bold'>ACME Trading Platform</h1>
         </div>
-      </header>
+        <div className='navbar-end gap-2'>
+          <ThemeToggle />
+          <div className='badge badge-warning badge-outline'>DEV</div>
+        </div>
+      </div>
 
-      {/* Main Content */}
       <main className='max-w-[1920px] mx-auto px-6 py-8'>
         <div className='grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6'>
           {traders?.map((trader) => (
-            <div key={trader.name} className='flex'>
-              <TraderCard traderName={trader.name} strategy={trader.strategy} />
-            </div>
+            <TraderCard
+              key={trader.name}
+              traderName={trader.name}
+              strategy={trader.strategy}
+            />
           ))}
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className='bg-white border-t mt-12'>
-        <div className='max-w-[1920px] mx-auto px-6 py-4'>
-          <p className='text-center text-gray-500 text-sm'>
-            Real-time portfolio updates every 30 seconds
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

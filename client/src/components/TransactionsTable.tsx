@@ -14,63 +14,48 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
 
   return (
     <div className='overflow-x-auto'>
-      <table className='min-w-full divide-y divide-gray-200'>
-        <thead className='bg-gray-50'>
+      <table className='table table-xs table-pin-rows'>
+        <thead>
           <tr>
-            <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-              Date
-            </th>
-            <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-              Type
-            </th>
-            <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-              Symbol
-            </th>
-            <th className='px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
-              Quantity
-            </th>
-            <th className='px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
-              Price
-            </th>
-            <th className='px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
-              Total
-            </th>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Symbol</th>
+            <th className='text-right'>Quantity</th>
+            <th className='text-right'>Price</th>
+            <th className='text-right'>Total</th>
           </tr>
         </thead>
-        <tbody className='bg-white divide-y divide-gray-200'>
+        <tbody>
           {transactions.map((transaction) => {
             const isBuy = transaction.type === 'BUY';
-            const badgeColor = isBuy
-              ? 'bg-green-100 text-green-800'
-              : 'bg-red-100 text-red-800';
             const total = transaction.quantity * transaction.price;
 
             return (
-              <tr key={transaction.id} className='hover:bg-gray-50'>
-                <td className='px-4 py-3 whitespace-nowrap text-sm text-gray-600'>
+              <tr key={transaction.id} className='hover'>
+                <td className='text-xs'>
                   {format(new Date(transaction.timestamp), 'MMM d, HH:mm')}
                 </td>
-                <td className='px-4 py-3 whitespace-nowrap'>
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${badgeColor}`}
+                <td>
+                  <div
+                    className={`badge badge-sm ${isBuy ? 'badge-success' : 'badge-error'}`}
                   >
                     {transaction.type}
-                  </span>
+                  </div>
                 </td>
-                <td className='px-4 py-3 whitespace-nowrap font-medium text-gray-900'>
-                  {transaction.symbol}
+                <td>
+                  <div className='badge badge-primary badge-outline badge-sm'>
+                    {transaction.symbol}
+                  </div>
                 </td>
-                <td className='px-4 py-3 whitespace-nowrap text-right text-gray-900'>
-                  {transaction.quantity}
-                </td>
-                <td className='px-4 py-3 whitespace-nowrap text-right text-gray-900'>
+                <td className='text-right font-mono'>{transaction.quantity}</td>
+                <td className='text-right font-mono'>
                   ${transaction.price.toFixed(2)}
                 </td>
-                <td className='px-4 py-3 whitespace-nowrap text-right font-medium text-gray-900'>
+                <td className='text-right font-mono font-bold'>
                   $
                   {total.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
                   })}
                 </td>
               </tr>
@@ -79,11 +64,13 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
         </tbody>
       </table>
       {transactions.length > 0 && transactions[0].rationale && (
-        <div className='mt-4 p-4 bg-blue-50 rounded-lg'>
-          <p className='text-sm font-medium text-gray-700 mb-1'>
-            Latest Trade Rationale:
-          </p>
-          <p className='text-sm text-gray-600'>{transactions[0].rationale}</p>
+        <div className='alert alert-info mt-4'>
+          <div>
+            <div className='font-semibold'>Latest Trade Rationale:</div>
+            <div className='prose prose-sm max-w-none mt-1'>
+              <p>{transactions[0].rationale}</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
