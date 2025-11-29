@@ -4,6 +4,7 @@ import { ResearcherAgent } from '../agents/ResearcherAgent.js';
 import { AccountService } from '../services/AccountService.js';
 import { TradeLogService } from '../services/TradeLogService.js';
 import { DatabaseService } from '../services/DatabaseService.js';
+import { PushoverService } from '../services/PushoverService.js';
 import { createTraderRoutes } from './traders.js';
 import { createPortfolioRoutes } from './portfolio.js';
 import { createTransactionRoutes } from './transactions.js';
@@ -17,6 +18,7 @@ export function createRoutes(
 ): Router {
   const db = DatabaseService.getInstance();
   const tradeLogService = new TradeLogService(db);
+  const pushoverService = new PushoverService();
   const router = Router();
 
   // Health check endpoint
@@ -29,6 +31,24 @@ export function createRoutes(
         traders: Array.from(traders.keys()),
       },
     });
+  });
+
+  // Test Pushover notification
+  router.post('/test-notification', async (req: Request, res: Response) => {
+    try {
+      const success = await pushoverService.sendTestNotification();
+      res.json({
+        success,
+        message: success
+          ? 'Test notification sent successfully!'
+          : 'Pushover is disabled or failed to send',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   });
 
   // Mount sub-routes
