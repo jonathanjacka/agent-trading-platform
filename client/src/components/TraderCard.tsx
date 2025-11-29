@@ -203,7 +203,13 @@ export const TraderCard = ({ traderName, strategy }: TraderCardProps) => {
             )}
           </button>
         </div>
-        {showLogs && <TradeLogsTable logs={logs} isLoading={logsLoading} />}
+        {showLogs && (
+          <TradeLogsTable
+            logs={logs}
+            isLoading={logsLoading}
+            traderName={traderName}
+          />
+        )}
       </div>
 
       <TradeSection traderName={traderName} />
