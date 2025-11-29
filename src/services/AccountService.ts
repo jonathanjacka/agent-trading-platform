@@ -1,5 +1,6 @@
 import { DatabaseService } from './DatabaseService.js';
 import { MarketDataService } from './MarketDataService.js';
+import { TradeLogService } from './TradeLogService.js';
 import { Logger } from '../utils/logger.js';
 
 export interface PortfolioSummary {
@@ -21,10 +22,14 @@ export interface PortfolioSummary {
 }
 
 export class AccountService {
+  private tradeLogService: TradeLogService;
+
   constructor(
     private db: DatabaseService,
     private marketData: MarketDataService
-  ) {}
+  ) {
+    this.tradeLogService = new TradeLogService(db);
+  }
 
   public async initializeAccount(
     traderName: string,
@@ -101,138 +106,337 @@ export class AccountService {
     traderName: string,
     symbol: string,
     quantity: number,
-    rationale: string
+    rationale: string,
+    prompt?: string
   ): Promise<{ success: boolean; message: string }> {
-    const account = this.db.getAccount(traderName);
-    if (!account) {
-      return { success: false, message: 'Account not found' };
-    }
+    const startTime = Date.now();
+    let portfolioBefore: PortfolioSummary | undefined;
+    let priceData: any;
+    let price: number;
 
-    // Get current price
-    const priceData = await this.marketData.getEstimatedPrice(symbol);
-    const price = priceData.estimatedPrice;
-    const totalCost = price * quantity;
+    try {
+      portfolioBefore = await this.getPortfolio(traderName);
 
-    // Check if enough cash
-    if (account.cash < totalCost) {
+      const account = this.db.getAccount(traderName);
+      if (!account) {
+        const executionTime = Date.now() - startTime;
+        this.tradeLogService.logTrade({
+          traderName,
+          prompt,
+          action: 'ERROR',
+          symbol,
+          quantity,
+          success: false,
+          errorMessage: 'Account not found',
+          executionTimeMs: executionTime,
+          rationale,
+          portfolioBefore,
+        });
+        return { success: false, message: 'Account not found' };
+      }
+
+      // Get current price
+      priceData = await this.marketData.getEstimatedPrice(symbol);
+      price = priceData.estimatedPrice;
+      const totalCost = price * quantity;
+
+      // Check if enough cash
+      if (account.cash < totalCost) {
+        const executionTime = Date.now() - startTime;
+        this.tradeLogService.logTrade({
+          traderName,
+          prompt,
+          action: 'BUY',
+          symbol,
+          quantity,
+          price,
+          success: false,
+          errorMessage: `Insufficient funds. Need $${totalCost.toFixed(2)}, have $${account.cash.toFixed(2)}`,
+          executionTimeMs: executionTime,
+          rationale,
+          marketDataSnapshot: {
+            price,
+            marketCap: priceData.marketCap,
+            estimatedPrice: priceData.estimatedPrice,
+          },
+          portfolioBefore,
+        });
+        return {
+          success: false,
+          message: `Insufficient funds. Need $${totalCost.toFixed(2)}, have $${account.cash.toFixed(2)}`,
+        };
+      }
+
+      // Get existing holding to calculate new average price
+      const existingHolding = this.db.getHolding(traderName, symbol);
+      let newQuantity: number;
+      let newAvgPrice: number;
+
+      if (existingHolding) {
+        newQuantity = existingHolding.quantity + quantity;
+        newAvgPrice =
+          (existingHolding.avg_price * existingHolding.quantity +
+            price * quantity) /
+          newQuantity;
+      } else {
+        newQuantity = quantity;
+        newAvgPrice = price;
+      }
+
+      // Update holdings
+      this.db.upsertHolding(traderName, symbol, newQuantity, newAvgPrice);
+
+      // Update cash
+      this.db.updateAccountCash(traderName, account.cash - totalCost);
+
+      // Record transaction
+      this.db.createTransaction(
+        traderName,
+        symbol,
+        quantity,
+        price,
+        'BUY',
+        rationale
+      );
+
+      const portfolioAfter = await this.getPortfolio(traderName);
+      const executionTime = Date.now() - startTime;
+
+      this.tradeLogService.logTrade({
+        traderName,
+        prompt,
+        action: 'BUY',
+        symbol,
+        quantity,
+        price,
+        success: true,
+        executionTimeMs: executionTime,
+        rationale,
+        marketDataSnapshot: {
+          price,
+          marketCap: priceData.marketCap,
+          estimatedPrice: priceData.estimatedPrice,
+        },
+        portfolioBefore,
+        portfolioAfter,
+      });
+
+      Logger.buyOrder(
+        traderName,
+        quantity,
+        symbol,
+        `@ $${price.toFixed(2)} = $${totalCost.toFixed(2)}`
+      );
+
       return {
-        success: false,
-        message: `Insufficient funds. Need $${totalCost.toFixed(2)}, have $${account.cash.toFixed(2)}`,
+        success: true,
+        message: `Bought ${quantity} shares of ${symbol} at $${price.toFixed(2)}`,
       };
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      this.tradeLogService.logTrade({
+        traderName,
+        prompt,
+        action: 'BUY',
+        symbol,
+        quantity,
+        price: price!,
+        success: false,
+        errorMessage,
+        executionTimeMs: executionTime,
+        rationale,
+        marketDataSnapshot: priceData
+          ? {
+              price: price!,
+              marketCap: priceData.marketCap,
+              estimatedPrice: priceData.estimatedPrice,
+            }
+          : undefined,
+        portfolioBefore,
+      });
+
+      Logger.error(`Buy order failed for ${traderName}`, error);
+      throw error;
     }
-
-    // Get existing holding to calculate new average price
-    const existingHolding = this.db.getHolding(traderName, symbol);
-    let newQuantity: number;
-    let newAvgPrice: number;
-
-    if (existingHolding) {
-      newQuantity = existingHolding.quantity + quantity;
-      newAvgPrice =
-        (existingHolding.avg_price * existingHolding.quantity +
-          price * quantity) /
-        newQuantity;
-    } else {
-      newQuantity = quantity;
-      newAvgPrice = price;
-    }
-
-    // Update holdings
-    this.db.upsertHolding(traderName, symbol, newQuantity, newAvgPrice);
-
-    // Update cash
-    this.db.updateAccountCash(traderName, account.cash - totalCost);
-
-    // Record transaction
-    this.db.createTransaction(
-      traderName,
-      symbol,
-      quantity,
-      price,
-      'BUY',
-      rationale
-    );
-
-    Logger.buyOrder(
-      traderName,
-      quantity,
-      symbol,
-      `@ $${price.toFixed(2)} = $${totalCost.toFixed(2)}`
-    );
-
-    return {
-      success: true,
-      message: `Bought ${quantity} shares of ${symbol} at $${price.toFixed(2)}`,
-    };
   }
 
   public async sellStock(
     traderName: string,
     symbol: string,
     quantity: number,
-    rationale: string
+    rationale: string,
+    prompt?: string
   ): Promise<{ success: boolean; message: string }> {
-    const account = this.db.getAccount(traderName);
-    if (!account) {
-      return { success: false, message: 'Account not found' };
-    }
+    const startTime = Date.now();
+    let portfolioBefore: PortfolioSummary | undefined;
+    let priceData: any;
+    let price: number;
+    let holding: any;
 
-    // Check if holding exists
-    const holding = this.db.getHolding(traderName, symbol);
-    if (!holding) {
+    try {
+      portfolioBefore = await this.getPortfolio(traderName);
+
+      const account = this.db.getAccount(traderName);
+      if (!account) {
+        const executionTime = Date.now() - startTime;
+        this.tradeLogService.logTrade({
+          traderName,
+          prompt,
+          action: 'ERROR',
+          symbol,
+          quantity,
+          success: false,
+          errorMessage: 'Account not found',
+          executionTimeMs: executionTime,
+          rationale,
+          portfolioBefore,
+        });
+        return { success: false, message: 'Account not found' };
+      }
+
+      // Check if holding exists
+      holding = this.db.getHolding(traderName, symbol);
+      if (!holding) {
+        const executionTime = Date.now() - startTime;
+        this.tradeLogService.logTrade({
+          traderName,
+          prompt,
+          action: 'SELL',
+          symbol,
+          quantity,
+          success: false,
+          errorMessage: `No holdings found for ${symbol}`,
+          executionTimeMs: executionTime,
+          rationale,
+          portfolioBefore,
+        });
+        return {
+          success: false,
+          message: `No holdings found for ${symbol}`,
+        };
+      }
+
+      if (holding.quantity < quantity) {
+        const executionTime = Date.now() - startTime;
+        this.tradeLogService.logTrade({
+          traderName,
+          prompt,
+          action: 'SELL',
+          symbol,
+          quantity,
+          success: false,
+          errorMessage: `Insufficient shares. Have ${holding.quantity}, trying to sell ${quantity}`,
+          executionTimeMs: executionTime,
+          rationale,
+          portfolioBefore,
+        });
+        return {
+          success: false,
+          message: `Insufficient shares. Have ${holding.quantity}, trying to sell ${quantity}`,
+        };
+      }
+
+      // Get current price
+      priceData = await this.marketData.getEstimatedPrice(symbol);
+      price = priceData.estimatedPrice;
+      const totalProceeds = price * quantity;
+
+      // Update holdings
+      const newQuantity = holding.quantity - quantity;
+      if (newQuantity === 0) {
+        this.db.deleteHolding(traderName, symbol);
+      } else {
+        this.db.upsertHolding(
+          traderName,
+          symbol,
+          newQuantity,
+          holding.avg_price
+        );
+      }
+
+      // Update cash
+      this.db.updateAccountCash(traderName, account.cash + totalProceeds);
+
+      // Record transaction
+      this.db.createTransaction(
+        traderName,
+        symbol,
+        quantity,
+        price,
+        'SELL',
+        rationale
+      );
+
+      const gain = (price - holding.avg_price) * quantity;
+      const gainPercent = (gain / (holding.avg_price * quantity)) * 100;
+
+      const portfolioAfter = await this.getPortfolio(traderName);
+      const executionTime = Date.now() - startTime;
+
+      this.tradeLogService.logTrade({
+        traderName,
+        prompt,
+        action: 'SELL',
+        symbol,
+        quantity,
+        price,
+        success: true,
+        executionTimeMs: executionTime,
+        rationale,
+        marketDataSnapshot: {
+          price,
+          marketCap: priceData.marketCap,
+          estimatedPrice: priceData.estimatedPrice,
+          gain,
+          gainPercent,
+        },
+        portfolioBefore,
+        portfolioAfter,
+      });
+
+      Logger.sellOrder(
+        traderName,
+        quantity,
+        symbol,
+        `@ $${price.toFixed(2)} = $${totalProceeds.toFixed(2)} (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`
+      );
+
       return {
-        success: false,
-        message: `No holdings found for ${symbol}`,
+        success: true,
+        message: `Sold ${quantity} shares of ${symbol} at $${price.toFixed(2)} (Gain: ${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`,
       };
-    }
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
 
-    if (holding.quantity < quantity) {
-      return {
+      this.tradeLogService.logTrade({
+        traderName,
+        prompt,
+        action: 'SELL',
+        symbol,
+        quantity,
+        price: price!,
         success: false,
-        message: `Insufficient shares. Have ${holding.quantity}, trying to sell ${quantity}`,
-      };
+        errorMessage,
+        executionTimeMs: executionTime,
+        rationale,
+        marketDataSnapshot: priceData
+          ? {
+              price: price!,
+              marketCap: priceData.marketCap,
+              estimatedPrice: priceData.estimatedPrice,
+            }
+          : undefined,
+        portfolioBefore,
+      });
+
+      Logger.error(`Sell order failed for ${traderName}`, error);
+      throw error;
     }
-
-    // Get current price
-    const priceData = await this.marketData.getEstimatedPrice(symbol);
-    const price = priceData.estimatedPrice;
-    const totalProceeds = price * quantity;
-
-    // Update holdings
-    const newQuantity = holding.quantity - quantity;
-    if (newQuantity === 0) {
-      this.db.deleteHolding(traderName, symbol);
-    } else {
-      this.db.upsertHolding(traderName, symbol, newQuantity, holding.avg_price);
-    }
-
-    // Update cash
-    this.db.updateAccountCash(traderName, account.cash + totalProceeds);
-
-    // Record transaction
-    this.db.createTransaction(
-      traderName,
-      symbol,
-      quantity,
-      price,
-      'SELL',
-      rationale
-    );
-
-    const gain = (price - holding.avg_price) * quantity;
-    const gainPercent = (gain / (holding.avg_price * quantity)) * 100;
-
-    Logger.sellOrder(
-      traderName,
-      quantity,
-      symbol,
-      `@ $${price.toFixed(2)} = $${totalProceeds.toFixed(2)} (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`
-    );
-
-    return {
-      success: true,
-      message: `Sold ${quantity} shares of ${symbol} at $${price.toFixed(2)} (Gain: ${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`,
-    };
   }
 
   public async recordPortfolioSnapshot(traderName: string): Promise<void> {
