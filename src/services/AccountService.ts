@@ -1,6 +1,7 @@
 import { DatabaseService } from './DatabaseService.js';
 import { MarketDataService } from './MarketDataService.js';
 import { TradeLogService } from './TradeLogService.js';
+import { PushoverService } from './PushoverService.js';
 import { Logger } from '../utils/logger.js';
 
 export interface PortfolioSummary {
@@ -23,12 +24,14 @@ export interface PortfolioSummary {
 
 export class AccountService {
   private tradeLogService: TradeLogService;
+  private pushoverService: PushoverService;
 
   constructor(
     private db: DatabaseService,
     private marketData: MarketDataService
   ) {
     this.tradeLogService = new TradeLogService(db);
+    this.pushoverService = new PushoverService();
   }
 
   public async initializeAccount(
@@ -221,6 +224,16 @@ export class AccountService {
         portfolioAfter,
       });
 
+      // Send Pushover notification for successful trade
+      await this.pushoverService.notifyTrade(
+        traderName,
+        'BUY',
+        symbol,
+        quantity,
+        price,
+        totalCost
+      );
+
       Logger.buyOrder(
         traderName,
         quantity,
@@ -257,6 +270,15 @@ export class AccountService {
           : undefined,
         portfolioBefore,
       });
+
+      // Send Pushover notification for failed trade
+      await this.pushoverService.notifyTradeError(
+        traderName,
+        'BUY',
+        symbol,
+        quantity,
+        errorMessage
+      );
 
       Logger.error(`Buy order failed for ${traderName}`, error);
       throw error;
@@ -397,6 +419,16 @@ export class AccountService {
         portfolioAfter,
       });
 
+      // Send Pushover notification for successful trade
+      await this.pushoverService.notifyTrade(
+        traderName,
+        'SELL',
+        symbol,
+        quantity,
+        price,
+        totalProceeds
+      );
+
       Logger.sellOrder(
         traderName,
         quantity,
@@ -433,6 +465,15 @@ export class AccountService {
           : undefined,
         portfolioBefore,
       });
+
+      // Send Pushover notification for failed trade
+      await this.pushoverService.notifyTradeError(
+        traderName,
+        'SELL',
+        symbol,
+        quantity,
+        errorMessage
+      );
 
       Logger.error(`Sell order failed for ${traderName}`, error);
       throw error;
