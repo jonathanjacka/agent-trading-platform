@@ -12,44 +12,42 @@ export function createAnalyticsRoutes(
   };
 
   // Get trade logs for a trader
-  router.get(
-    '/trade-logs/:traderName',
-    async (req: Request, res: Response) => {
-      try {
-        const { traderName } = req.params;
-        const limit = parseInt(req.query.limit as string) || 50;
-        const symbol = req.query.symbol as string | undefined;
-        const success =
-          req.query.success ? req.query.success === 'true' : undefined;
-        const startDate = req.query.startDate as string | undefined;
-        const endDate = req.query.endDate as string | undefined;
+  router.get('/trade-logs/:traderName', async (req: Request, res: Response) => {
+    try {
+      const { traderName } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const symbol = req.query.symbol as string | undefined;
+      const success = req.query.success
+        ? req.query.success === 'true'
+        : undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
 
-        const formattedName = formatTraderName(traderName);
+      const formattedName = formatTraderName(traderName);
 
-        const logs = tradeLogService.getTradeLogs(formattedName, {
-          limit,
-          symbol,
-          success,
-          startDate,
-          endDate,
-        });
+      const logs = tradeLogService.getTradeLogs(formattedName, {
+        limit,
+        symbol,
+        success,
+        startDate,
+        endDate,
+      });
 
-        res.json({
-          success: true,
-          trader: formattedName,
-          logs,
-          count: logs.length,
-          timestamp: new Date().toISOString(),
-        });
-      } catch (error) {
-        Logger.error('Trade logs error', error);
-        res.status(500).json({
-          error: 'Failed to get trade logs',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
+      res.json({
+        success: true,
+        trader: formattedName,
+        logs,
+        count: logs.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      Logger.error('Trade logs error', error);
+      res.status(500).json({
+        error: 'Failed to get trade logs',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
-  );
+  });
 
   // Get analytics for a trader
   router.get('/:traderName', async (req: Request, res: Response) => {

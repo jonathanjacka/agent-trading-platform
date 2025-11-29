@@ -2,9 +2,7 @@ import { Router, Request, Response } from 'express';
 import { ResearcherAgent } from '../agents/ResearcherAgent.js';
 import { Logger } from '../utils/logger.js';
 
-export function createResearchRoutes(
-  researcherAgent: ResearcherAgent
-): Router {
+export function createResearchRoutes(researcherAgent: ResearcherAgent): Router {
   const router = Router();
 
   // Research endpoint

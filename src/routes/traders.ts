@@ -2,9 +2,7 @@ import { Router, Request, Response } from 'express';
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { Logger } from '../utils/logger.js';
 
-export function createTraderRoutes(
-  traders: Map<string, TraderAgent>
-): Router {
+export function createTraderRoutes(traders: Map<string, TraderAgent>): Router {
   const router = Router();
 
   // Get all traders info

@@ -6,6 +6,8 @@ import type {
   PortfolioValue,
   TradeResponse,
 } from '../types';
+import type { TradeLog } from '../hooks/useTradeLogs';
+import type { TraderAnalytics } from '../hooks/useAnalytics';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -46,7 +48,7 @@ export const tradersApi = {
     limit = 100
   ): Promise<PortfolioValue[]> => {
     const { data } = await api.get<{ history: PortfolioValue[] }>(
-      `/api/portfolio-history/${name}`,
+      `/api/portfolio/${name}/history`,
       { params: { limit } }
     );
     return data.history;
@@ -57,9 +59,36 @@ export const tradersApi = {
     name: string,
     prompt: string
   ): Promise<TradeResponse> => {
-    const { data } = await api.post<TradeResponse>(`/api/trade/${name}`, {
-      prompt,
-    });
+    const { data } = await api.post<TradeResponse>(
+      `/api/traders/${name}/trade`,
+      { prompt }
+    );
     return data;
+  },
+
+  // Get trade logs
+  getTradeLogs: async (
+    name: string,
+    options: {
+      limit?: number;
+      symbol?: string;
+      success?: boolean;
+      startDate?: string;
+      endDate?: string;
+    } = {}
+  ): Promise<TradeLog[]> => {
+    const { data } = await api.get<{ logs: TradeLog[] }>(
+      `/api/analytics/trade-logs/${name}`,
+      { params: options }
+    );
+    return data.logs;
+  },
+
+  // Get trader analytics
+  getAnalytics: async (name: string): Promise<TraderAnalytics> => {
+    const { data } = await api.get<{ analytics: TraderAnalytics }>(
+      `/api/analytics/${name}`
+    );
+    return data.analytics;
   },
 };
