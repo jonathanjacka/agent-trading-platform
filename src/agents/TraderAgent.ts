@@ -14,6 +14,7 @@ export class TraderAgent {
   private instructions: string;
   private researcherAgent: ResearcherAgent;
   private accountService: AccountService;
+  private currentPrompt: string | undefined;
 
   constructor(
     name: string,
@@ -106,7 +107,8 @@ Current datetime: ${new Date().toISOString()}`;
             this.name,
             symbol,
             quantity,
-            rationale
+            rationale,
+            this.currentPrompt
           );
 
           if (!result.success) {
@@ -134,7 +136,8 @@ Current datetime: ${new Date().toISOString()}`;
             this.name,
             symbol,
             quantity,
-            rationale
+            rationale,
+            this.currentPrompt
           );
 
           if (!result.success) {
@@ -150,6 +153,7 @@ Current datetime: ${new Date().toISOString()}`;
   }
 
   async trade(prompt: string): Promise<string> {
+    this.currentPrompt = prompt;
     Logger.traderAction(this.name, 'Starting trading session');
     Logger.trader(this.name, `Strategy: ${this.strategy}`);
 

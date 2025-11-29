@@ -45,6 +45,32 @@ export interface Log {
   message: string;
 }
 
+export interface TradeLog {
+  id: number;
+  trader_name: string;
+  timestamp: string;
+  prompt: string | null;
+  action: 'BUY' | 'SELL' | 'HOLD' | 'ERROR';
+  symbol: string | null;
+  quantity: number | null;
+  price: number | null;
+  success: boolean;
+  error_message: string | null;
+  execution_time_ms: number;
+  rationale: string | null;
+  market_data_snapshot: string | null;
+  portfolio_before: string | null;
+  portfolio_after: string | null;
+}
+
+export interface TraderState {
+  trader_name: string;
+  last_trade_timestamp: string | null;
+  trades_today: number;
+  last_reset_date: string;
+  api_calls_today: number;
+}
+
 export class DatabaseService {
   private db: Database.Database;
   private static instance: DatabaseService;
@@ -148,6 +174,54 @@ export class DatabaseService {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_logs_trader 
       ON logs(trader_name, timestamp DESC)
+    `);
+
+    // Trade logs table (comprehensive trade logging)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS trade_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trader_name TEXT NOT NULL,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+        prompt TEXT,
+        action TEXT NOT NULL CHECK(action IN ('BUY', 'SELL', 'HOLD', 'ERROR')),
+        symbol TEXT,
+        quantity REAL,
+        price REAL,
+        success BOOLEAN NOT NULL,
+        error_message TEXT,
+        execution_time_ms INTEGER NOT NULL,
+        rationale TEXT,
+        market_data_snapshot TEXT,
+        portfolio_before TEXT,
+        portfolio_after TEXT,
+        FOREIGN KEY (trader_name) REFERENCES accounts(trader_name)
+      )
+    `);
+
+    // Create indexes for trade_logs
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_trade_logs_trader_time 
+      ON trade_logs(trader_name, timestamp DESC)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_trade_logs_symbol 
+      ON trade_logs(symbol, timestamp DESC)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_trade_logs_success 
+      ON trade_logs(success, timestamp DESC)
+    `);
+
+    // Trader state table (rate limiting and scheduling)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS trader_state (
+        trader_name TEXT PRIMARY KEY,
+        last_trade_timestamp TEXT,
+        trades_today INTEGER DEFAULT 0,
+        last_reset_date TEXT DEFAULT (date('now')),
+        api_calls_today INTEGER DEFAULT 0,
+        FOREIGN KEY (trader_name) REFERENCES accounts(trader_name)
+      )
     `);
   }
 
@@ -323,12 +397,166 @@ export class DatabaseService {
     return stmt.all(traderName, limit) as Log[];
   }
 
+  // Trade log operations
+  public createTradeLog(log: Omit<TradeLog, 'id' | 'timestamp'>): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO trade_logs (
+        trader_name, prompt, action, symbol, quantity, price,
+        success, error_message, execution_time_ms, rationale,
+        market_data_snapshot, portfolio_before, portfolio_after
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const result = stmt.run(
+      log.trader_name,
+      log.prompt,
+      log.action,
+      log.symbol,
+      log.quantity,
+      log.price,
+      log.success ? 1 : 0,
+      log.error_message,
+      log.execution_time_ms,
+      log.rationale,
+      log.market_data_snapshot,
+      log.portfolio_before,
+      log.portfolio_after
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  public getTradeLogs(
+    traderName: string,
+    options: {
+      limit?: number;
+      symbol?: string;
+      success?: boolean;
+      startDate?: string;
+      endDate?: string;
+    } = {}
+  ): TradeLog[] {
+    const { limit = 50, symbol, success, startDate, endDate } = options;
+
+    let query = `SELECT * FROM trade_logs WHERE trader_name = ?`;
+    const params: any[] = [traderName];
+
+    if (symbol) {
+      query += ` AND symbol = ?`;
+      params.push(symbol);
+    }
+
+    if (success !== undefined) {
+      query += ` AND success = ?`;
+      params.push(success ? 1 : 0);
+    }
+
+    if (startDate) {
+      query += ` AND timestamp >= ?`;
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ` AND timestamp <= ?`;
+      params.push(endDate);
+    }
+
+    query += ` ORDER BY timestamp DESC LIMIT ?`;
+    params.push(limit);
+
+    const stmt = this.db.prepare(query);
+    const results = stmt.all(...params) as any[];
+
+    return results.map((row) => ({
+      ...row,
+      success: Boolean(row.success),
+    })) as TradeLog[];
+  }
+
+  public getAllTradeLogs(limit: number = 100): TradeLog[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM trade_logs 
+      ORDER BY timestamp DESC 
+      LIMIT ?
+    `);
+    const results = stmt.all(limit) as any[];
+
+    return results.map((row) => ({
+      ...row,
+      success: Boolean(row.success),
+    })) as TradeLog[];
+  }
+
+  // Trader state operations
+  public getTraderState(traderName: string): TraderState | undefined {
+    const stmt = this.db.prepare(
+      'SELECT * FROM trader_state WHERE trader_name = ?'
+    );
+    return stmt.get(traderName) as TraderState | undefined;
+  }
+
+  public initializeTraderState(traderName: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO trader_state (trader_name)
+      VALUES (?)
+    `);
+    stmt.run(traderName);
+  }
+
+  public updateTraderState(
+    traderName: string,
+    updates: Partial<Omit<TraderState, 'trader_name'>>
+  ): void {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.last_trade_timestamp !== undefined) {
+      fields.push('last_trade_timestamp = ?');
+      values.push(updates.last_trade_timestamp);
+    }
+
+    if (updates.trades_today !== undefined) {
+      fields.push('trades_today = ?');
+      values.push(updates.trades_today);
+    }
+
+    if (updates.last_reset_date !== undefined) {
+      fields.push('last_reset_date = ?');
+      values.push(updates.last_reset_date);
+    }
+
+    if (updates.api_calls_today !== undefined) {
+      fields.push('api_calls_today = ?');
+      values.push(updates.api_calls_today);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(traderName);
+    const stmt = this.db.prepare(`
+      UPDATE trader_state 
+      SET ${fields.join(', ')} 
+      WHERE trader_name = ?
+    `);
+    stmt.run(...values);
+  }
+
+  public resetDailyTraderState(traderName: string): void {
+    const stmt = this.db.prepare(`
+      UPDATE trader_state 
+      SET trades_today = 0, api_calls_today = 0, last_reset_date = date('now')
+      WHERE trader_name = ?
+    `);
+    stmt.run(traderName);
+  }
+
   // Utility operations
   public close(): void {
     this.db.close();
   }
 
   public resetDatabase(): void {
+    this.db.exec('DELETE FROM trade_logs');
+    this.db.exec('DELETE FROM trader_state');
     this.db.exec('DELETE FROM logs');
     this.db.exec('DELETE FROM portfolio_values');
     this.db.exec('DELETE FROM transactions');

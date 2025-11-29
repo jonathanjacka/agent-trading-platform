@@ -3,3 +3,5 @@ export { usePortfolio } from './usePortfolio';
 export { useTransactions } from './useTransactions';
 export { usePortfolioHistory } from './usePortfolioHistory';
 export { useTrade } from './useTrade';
+export { useTradeLogs } from './useTradeLogs';
+export { useAnalytics } from './useAnalytics';
