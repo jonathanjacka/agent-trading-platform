@@ -65,10 +65,36 @@ export interface TradeLog {
 
 export interface TraderState {
   trader_name: string;
-  last_trade_timestamp: string | null;
+  last_trade_timestamp?: string;
   trades_today: number;
   last_reset_date: string;
   api_calls_today: number;
+}
+
+export interface AgentMemory {
+  id: number;
+  agent_name: string;
+  memory_type: string;
+  content: string;
+  context?: string; // JSON
+  confidence: number;
+  created_at: string;
+  last_used_at?: string;
+  use_count: number;
+  success_count: number;
+  failure_count: number;
+  tags?: string; // JSON array
+}
+
+export interface CollectiveInsight {
+  id: number;
+  insight_type: string;
+  content: string;
+  contributing_agents: string; // JSON array
+  confidence: number;
+  evidence_count: number;
+  created_at: string;
+  tags?: string; // JSON array
 }
 
 export class DatabaseService {
@@ -222,6 +248,63 @@ export class DatabaseService {
         api_calls_today INTEGER DEFAULT 0,
         FOREIGN KEY (trader_name) REFERENCES accounts(trader_name)
       )
+    `);
+
+    // Agent memory table (individual agent experiences)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_memory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name TEXT NOT NULL,
+        memory_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        context TEXT,
+        confidence REAL NOT NULL DEFAULT 0.5,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        last_used_at TEXT,
+        use_count INTEGER DEFAULT 0,
+        success_count INTEGER DEFAULT 0,
+        failure_count INTEGER DEFAULT 0,
+        tags TEXT,
+        FOREIGN KEY (agent_name) REFERENCES accounts(trader_name)
+      )
+    `);
+
+    // Create indexes for agent_memory
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_agent_memory_agent 
+      ON agent_memory(agent_name)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_agent_memory_type 
+      ON agent_memory(memory_type)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_agent_memory_confidence 
+      ON agent_memory(confidence DESC)
+    `);
+
+    // Collective insights table (cross-agent patterns)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS collective_insights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        insight_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        contributing_agents TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        evidence_count INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        tags TEXT
+      )
+    `);
+
+    // Create indexes for collective_insights
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_collective_insights_type 
+      ON collective_insights(insight_type)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_collective_insights_confidence 
+      ON collective_insights(confidence DESC)
     `);
   }
 
@@ -549,12 +632,306 @@ export class DatabaseService {
     stmt.run(traderName);
   }
 
+  // Agent memory operations
+  public createAgentMemory(
+    memory: Omit<AgentMemory, 'id' | 'created_at'>
+  ): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO agent_memory (
+        agent_name, memory_type, content, context, confidence,
+        last_used_at, use_count, success_count, failure_count, tags
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const result = stmt.run(
+      memory.agent_name,
+      memory.memory_type,
+      memory.content,
+      memory.context,
+      memory.confidence,
+      memory.last_used_at,
+      memory.use_count,
+      memory.success_count,
+      memory.failure_count,
+      memory.tags
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  public getAgentMemory(memoryId: number): AgentMemory | undefined {
+    const stmt = this.db.prepare('SELECT * FROM agent_memory WHERE id = ?');
+    return stmt.get(memoryId) as AgentMemory | undefined;
+  }
+
+  public getAgentMemories(
+    agentName: string,
+    options: {
+      memoryType?: string;
+      minConfidence?: number;
+      limit?: number;
+      tags?: string[];
+    } = {}
+  ): AgentMemory[] {
+    const { memoryType, minConfidence = 0, limit = 50, tags } = options;
+
+    let query = `SELECT * FROM agent_memory WHERE agent_name = ?`;
+    const params: any[] = [agentName];
+
+    if (memoryType) {
+      query += ` AND memory_type = ?`;
+      params.push(memoryType);
+    }
+
+    if (minConfidence > 0) {
+      query += ` AND confidence >= ?`;
+      params.push(minConfidence);
+    }
+
+    if (tags && tags.length > 0) {
+      // Simple tag filtering - for more complex queries, consider JSON functions
+      const tagConditions = tags.map(() => `tags LIKE ?`).join(' OR ');
+      query += ` AND (${tagConditions})`;
+      tags.forEach((tag) => params.push(`%"${tag}"%`));
+    }
+
+    query += ` ORDER BY confidence DESC, created_at DESC LIMIT ?`;
+    params.push(limit);
+
+    const stmt = this.db.prepare(query);
+    return stmt.all(...params) as AgentMemory[];
+  }
+
+  public updateAgentMemory(
+    memoryId: number,
+    updates: Partial<
+      Omit<AgentMemory, 'id' | 'agent_name' | 'created_at' | 'memory_type'>
+    >
+  ): void {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.content !== undefined) {
+      fields.push('content = ?');
+      values.push(updates.content);
+    }
+
+    if (updates.context !== undefined) {
+      fields.push('context = ?');
+      values.push(updates.context);
+    }
+
+    if (updates.confidence !== undefined) {
+      fields.push('confidence = ?');
+      values.push(updates.confidence);
+    }
+
+    if (updates.last_used_at !== undefined) {
+      fields.push('last_used_at = ?');
+      values.push(updates.last_used_at);
+    }
+
+    if (updates.use_count !== undefined) {
+      fields.push('use_count = ?');
+      values.push(updates.use_count);
+    }
+
+    if (updates.success_count !== undefined) {
+      fields.push('success_count = ?');
+      values.push(updates.success_count);
+    }
+
+    if (updates.failure_count !== undefined) {
+      fields.push('failure_count = ?');
+      values.push(updates.failure_count);
+    }
+
+    if (updates.tags !== undefined) {
+      fields.push('tags = ?');
+      values.push(updates.tags);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(memoryId);
+    const stmt = this.db.prepare(`
+      UPDATE agent_memory 
+      SET ${fields.join(', ')} 
+      WHERE id = ?
+    `);
+    stmt.run(...values);
+  }
+
+  public deleteAgentMemory(memoryId: number): void {
+    const stmt = this.db.prepare('DELETE FROM agent_memory WHERE id = ?');
+    stmt.run(memoryId);
+  }
+
+  public incrementMemoryUsage(memoryId: number, wasSuccessful: boolean): void {
+    const stmt = this.db.prepare(`
+      UPDATE agent_memory 
+      SET use_count = use_count + 1,
+          success_count = success_count + ?,
+          failure_count = failure_count + ?,
+          last_used_at = datetime('now')
+      WHERE id = ?
+    `);
+    stmt.run(wasSuccessful ? 1 : 0, wasSuccessful ? 0 : 1, memoryId);
+  }
+
+  public cleanupLowConfidenceMemories(
+    minConfidence: number = 0.3,
+    minAge: number = 7
+  ): number {
+    const stmt = this.db.prepare(`
+      DELETE FROM agent_memory 
+      WHERE confidence < ? 
+      AND datetime(created_at) <= datetime('now', '-' || ? || ' days')
+    `);
+    const result = stmt.run(minConfidence, minAge);
+    return result.changes;
+  }
+
+  // Collective insights operations
+  public createCollectiveInsight(
+    insight: Omit<CollectiveInsight, 'id' | 'created_at'>
+  ): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO collective_insights (
+        insight_type, content, contributing_agents, 
+        confidence, evidence_count, tags
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const result = stmt.run(
+      insight.insight_type,
+      insight.content,
+      insight.contributing_agents,
+      insight.confidence,
+      insight.evidence_count,
+      insight.tags
+    );
+    return result.lastInsertRowid as number;
+  }
+
+  public getCollectiveInsight(
+    insightId: number
+  ): CollectiveInsight | undefined {
+    const stmt = this.db.prepare(
+      'SELECT * FROM collective_insights WHERE id = ?'
+    );
+    return stmt.get(insightId) as CollectiveInsight | undefined;
+  }
+
+  public getCollectiveInsights(
+    options: {
+      insightType?: string;
+      minConfidence?: number;
+      minEvidenceCount?: number;
+      limit?: number;
+      tags?: string[];
+      excludeAgent?: string;
+    } = {}
+  ): CollectiveInsight[] {
+    const {
+      insightType,
+      minConfidence = 0,
+      minEvidenceCount = 1,
+      limit = 50,
+      tags,
+      excludeAgent,
+    } = options;
+
+    let query = `SELECT * FROM collective_insights WHERE evidence_count >= ?`;
+    const params: any[] = [minEvidenceCount];
+
+    if (insightType) {
+      query += ` AND insight_type = ?`;
+      params.push(insightType);
+    }
+
+    if (minConfidence > 0) {
+      query += ` AND confidence >= ?`;
+      params.push(minConfidence);
+    }
+
+    if (excludeAgent) {
+      query += ` AND contributing_agents NOT LIKE ?`;
+      params.push(`%"${excludeAgent}"%`);
+    }
+
+    if (tags && tags.length > 0) {
+      const tagConditions = tags.map(() => `tags LIKE ?`).join(' OR ');
+      query += ` AND (${tagConditions})`;
+      tags.forEach((tag) => params.push(`%"${tag}"%`));
+    }
+
+    query += ` ORDER BY confidence DESC, evidence_count DESC LIMIT ?`;
+    params.push(limit);
+
+    const stmt = this.db.prepare(query);
+    return stmt.all(...params) as CollectiveInsight[];
+  }
+
+  public updateCollectiveInsight(
+    insightId: number,
+    updates: Partial<
+      Omit<CollectiveInsight, 'id' | 'created_at' | 'insight_type'>
+    >
+  ): void {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.content !== undefined) {
+      fields.push('content = ?');
+      values.push(updates.content);
+    }
+
+    if (updates.contributing_agents !== undefined) {
+      fields.push('contributing_agents = ?');
+      values.push(updates.contributing_agents);
+    }
+
+    if (updates.confidence !== undefined) {
+      fields.push('confidence = ?');
+      values.push(updates.confidence);
+    }
+
+    if (updates.evidence_count !== undefined) {
+      fields.push('evidence_count = ?');
+      values.push(updates.evidence_count);
+    }
+
+    if (updates.tags !== undefined) {
+      fields.push('tags = ?');
+      values.push(updates.tags);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(insightId);
+    const stmt = this.db.prepare(`
+      UPDATE collective_insights 
+      SET ${fields.join(', ')} 
+      WHERE id = ?
+    `);
+    stmt.run(...values);
+  }
+
+  public deleteCollectiveInsight(insightId: number): void {
+    const stmt = this.db.prepare(
+      'DELETE FROM collective_insights WHERE id = ?'
+    );
+    stmt.run(insightId);
+  }
+
   // Utility operations
   public close(): void {
     this.db.close();
   }
 
   public resetDatabase(): void {
+    this.db.exec('DELETE FROM collective_insights');
+    this.db.exec('DELETE FROM agent_memory');
     this.db.exec('DELETE FROM trade_logs');
     this.db.exec('DELETE FROM trader_state');
     this.db.exec('DELETE FROM logs');

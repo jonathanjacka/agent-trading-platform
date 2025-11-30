@@ -6,6 +6,7 @@ import { Logger } from '../utils/logger.js';
 import { MarketDataService } from '../services/MarketDataService.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
 import { AccountService } from '../services/AccountService.js';
+import { MemoryService } from '../services/MemoryService.js';
 
 export class TraderAgent {
   private modelName: string;
@@ -14,6 +15,7 @@ export class TraderAgent {
   private instructions: string;
   private researcherAgent: ResearcherAgent;
   private accountService: AccountService;
+  private memoryService: MemoryService;
   private currentPrompt: string | undefined;
 
   constructor(
@@ -28,6 +30,7 @@ export class TraderAgent {
     this.strategy = strategy;
     this.modelName = modelName;
     this.accountService = accountService;
+    this.memoryService = MemoryService.getInstance();
     this.researcherAgent = new ResearcherAgent(
       marketData,
       braveSearch,
@@ -50,12 +53,17 @@ Available tools:
 - getPortfolio: Check current holdings and cash balance
 - buyStock: Execute a buy order
 - sellStock: Execute a sell order
+- reviewMemories: Review your past trading experiences and lessons learned
+- reviewCollectiveLessons: Learn from insights discovered by other agents
+- recordLesson: Manually record an important insight or lesson
 
 Guidelines:
 1. Always research before making trading decisions
 2. Consider your strategy when evaluating opportunities
-3. Explain your reasoning clearly
-4. Be decisive but not reckless
+3. Review your memories and collective lessons to learn from past experiences
+4. Record important insights when you discover patterns or lessons
+5. Explain your reasoning clearly
+6. Be decisive but not reckless
 
 Current datetime: ${new Date().toISOString()}`;
   }
@@ -147,6 +155,159 @@ Current datetime: ${new Date().toISOString()}`;
           }
 
           return result;
+        },
+      }),
+
+      reviewMemories: tool({
+        description:
+          'Review your past trading experiences, successes, and failures. Use this to learn from your history.',
+        inputSchema: z.object({
+          memoryType: z
+            .enum(['successful_trade', 'failed_trade', 'all'])
+            .optional()
+            .describe(
+              'Filter by memory type. Defaults to all if not specified.'
+            ),
+          minConfidence: z
+            .number()
+            .min(0)
+            .max(1)
+            .optional()
+            .describe(
+              'Minimum confidence score (0-1). Higher scores indicate more reliable memories.'
+            ),
+          limit: z
+            .number()
+            .positive()
+            .optional()
+            .describe(
+              'Maximum number of memories to retrieve. Defaults to 10.'
+            ),
+        }),
+        execute: async ({ memoryType, minConfidence, limit }) => {
+          Logger.info(
+            `${this.name} reviewing memories: type=${memoryType || 'all'}, minConfidence=${minConfidence || 0}`
+          );
+
+          const memories = this.memoryService.getAgentMemories(this.name, {
+            memoryType: memoryType === 'all' ? undefined : memoryType,
+            minConfidence: minConfidence || 0.3,
+            limit: limit || 10,
+          });
+
+          if (memories.length === 0) {
+            return {
+              message: 'No memories found matching your criteria.',
+              memories: [],
+            };
+          }
+
+          return {
+            message: `Found ${memories.length} relevant memories`,
+            memories: memories.map((m) => ({
+              type: m.memory_type,
+              content: m.content,
+              confidence: m.confidence,
+              usageCount: m.use_count,
+              successRate:
+                m.use_count > 0
+                  ? (m.success_count / m.use_count).toFixed(2)
+                  : 'N/A',
+              createdAt: m.created_at,
+              tags: m.tags,
+            })),
+          };
+        },
+      }),
+
+      reviewCollectiveLessons: tool({
+        description:
+          'Review insights and patterns discovered by other agents. Learn from collective wisdom.',
+        inputSchema: z.object({
+          insightType: z
+            .enum(['popular_stock', 'common_error', 'all'])
+            .optional()
+            .describe('Filter by insight type. Defaults to all.'),
+          minConfidence: z
+            .number()
+            .min(0)
+            .max(1)
+            .optional()
+            .describe('Minimum confidence score (0-1).'),
+          limit: z
+            .number()
+            .positive()
+            .optional()
+            .describe('Maximum number of insights to retrieve.'),
+        }),
+        execute: async ({ insightType, minConfidence, limit }) => {
+          Logger.info(
+            `${this.name} reviewing collective lessons: type=${insightType || 'all'}`
+          );
+
+          const insights = this.memoryService.getCollectiveInsights({
+            insightType: insightType === 'all' ? undefined : insightType,
+            minConfidence: minConfidence || 0.5,
+            limit: limit || 10,
+            excludeAgent: this.name, // Don't include insights you contributed to
+          });
+
+          if (insights.length === 0) {
+            return {
+              message:
+                'No collective insights found. Other agents may not have traded yet.',
+              insights: [],
+            };
+          }
+
+          return {
+            message: `Found ${insights.length} collective insights from other agents`,
+            insights: insights.map((i) => ({
+              type: i.insight_type,
+              content: i.content,
+              confidence: i.confidence,
+              evidenceCount: i.evidence_count,
+              contributingAgents: i.contributing_agents,
+              tags: i.tags,
+              createdAt: i.created_at,
+            })),
+          };
+        },
+      }),
+
+      recordLesson: tool({
+        description:
+          "Manually record an important insight, pattern, or lesson you've learned. Use this when you discover something significant.",
+        inputSchema: z.object({
+          content: z
+            .string()
+            .describe('The insight or lesson you want to remember'),
+          tags: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'Optional tags to categorize this lesson (e.g., ["AAPL", "earnings"])'
+            ),
+        }),
+        execute: async ({ content, tags }) => {
+          Logger.info(
+            `${this.name} recording lesson: ${content.substring(0, 50)}...`
+          );
+
+          const memoryId = this.memoryService.storeMemory(
+            this.name,
+            'manual_insight',
+            content,
+            undefined,
+            0.7, // Start with high confidence for manual insights
+            tags || []
+          );
+
+          return {
+            success: true,
+            message: `Lesson recorded successfully (ID: ${memoryId})`,
+            memoryId,
+          };
         },
       }),
     };
