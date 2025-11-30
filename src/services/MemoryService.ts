@@ -3,7 +3,7 @@ import {
   AgentMemory,
   CollectiveInsight,
   TradeLog,
-} from './DatabaseService';
+} from './DatabaseService.js';
 
 interface MemoryContext {
   symbol?: string;

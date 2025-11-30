@@ -1,4 +1,5 @@
 import { DatabaseService, TradeLog } from './DatabaseService.js';
+import { MemoryService } from './MemoryService.js';
 import { Logger } from '../utils/logger.js';
 
 export interface TradeLogData {
@@ -33,7 +34,11 @@ export interface TradeAnalytics {
 }
 
 export class TradeLogService {
-  constructor(private db: DatabaseService) {}
+  private memoryService: MemoryService;
+
+  constructor(private db: DatabaseService) {
+    this.memoryService = MemoryService.getInstance();
+  }
 
   public logTrade(data: TradeLogData): number {
     try {
@@ -67,6 +72,12 @@ export class TradeLogService {
         Logger.warn(
           `Failed trade logged: ${data.traderName} ${data.action} - ${data.errorMessage}`
         );
+      }
+
+      // Automatically generate memory from this trade
+      const tradeLog = this.db.getTradeLogs(data.traderName, { limit: 1 })[0];
+      if (tradeLog) {
+        this.memoryService.generateMemoryFromTrade(tradeLog);
       }
 
       return logId;
