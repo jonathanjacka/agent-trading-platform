@@ -3,9 +3,6 @@ import { MemoryService } from './MemoryService.js';
 import { PushoverService } from './PushoverService.js';
 import { Logger } from '../utils/logger.js';
 
-/**
- * Result from a single agent's trading session
- */
 export interface AgentResult {
   agentName: string;
   success: boolean;
@@ -16,9 +13,6 @@ export interface AgentResult {
   durationMs: number;
 }
 
-/**
- * Result from a full trading session (all agents)
- */
 export interface SessionResult {
   sessionId: string;
   startTime: Date;
@@ -32,9 +26,6 @@ export interface SessionResult {
   errors: string[];
 }
 
-/**
- * Options for running a trading session
- */
 export interface SessionOptions {
   /** Specific agents to run (default: all) */
   agents?: string[];
@@ -48,10 +39,6 @@ export interface SessionOptions {
   dryRun?: boolean;
 }
 
-/**
- * Default prompts for daily autonomous trading
- * Each agent gets a prompt tailored to their strategy
- */
 const DAILY_PROMPTS: Record<string, string> = {
   leonardo: `It's time for your daily trading session. 
 
@@ -102,15 +89,6 @@ Take bold contrarian positions when your analysis reveals market imbalances.`,
 Focus on systematic diversification and risk management across market conditions.`,
 };
 
-/**
- * TradingOrchestratorService
- * 
- * Coordinates multi-agent trading sessions with:
- * - Sequential execution with delays (respects rate limits)
- * - Graceful error handling (one agent failure doesn't stop others)
- * - Collective insights generation after trading
- * - Detailed session reporting
- */
 export class TradingOrchestratorService {
   private memoryService: MemoryService;
   private pushoverService: PushoverService;
@@ -120,9 +98,6 @@ export class TradingOrchestratorService {
     this.pushoverService = new PushoverService();
   }
 
-  /**
-   * Run a full daily trading session for all (or selected) agents
-   */
   async runDailySession(options: SessionOptions = {}): Promise<SessionResult> {
     const {
       agents = Array.from(this.traders.keys()),
@@ -154,9 +129,9 @@ export class TradingOrchestratorService {
         continue;
       }
 
-      // Get prompt (custom or default)
-      const prompt = customPrompts[agentName] || DAILY_PROMPTS[agentName.toLowerCase()];
-      
+      const prompt =
+        customPrompts[agentName] || DAILY_PROMPTS[agentName.toLowerCase()];
+
       if (!prompt) {
         const error = `No prompt available for agent: ${agentName}`;
         Logger.error(error);
@@ -164,8 +139,12 @@ export class TradingOrchestratorService {
         continue;
       }
 
-      // Run the agent
-      const result = await this.runSingleAgent(trader, agentName, prompt, dryRun);
+      const result = await this.runSingleAgent(
+        trader,
+        agentName,
+        prompt,
+        dryRun
+      );
       agentResults.push(result);
 
       if (!result.success) {
@@ -174,7 +153,9 @@ export class TradingOrchestratorService {
 
       // Delay before next agent (except after last one)
       if (i < agents.length - 1 && !dryRun) {
-        Logger.info(`Waiting ${delayBetweenAgentsMs / 1000}s before next agent...`);
+        Logger.info(
+          `Waiting ${delayBetweenAgentsMs / 1000}s before next agent...`
+        );
         await this.sleep(delayBetweenAgentsMs);
       }
     }
@@ -184,8 +165,11 @@ export class TradingOrchestratorService {
     if (!skipInsights && !dryRun) {
       Logger.info('Generating collective insights...');
       try {
-        collectiveInsightsGenerated = await this.memoryService.generateCollectiveInsights();
-        Logger.success(`Generated ${collectiveInsightsGenerated} collective insights`);
+        collectiveInsightsGenerated =
+          await this.memoryService.generateCollectiveInsights();
+        Logger.success(
+          `Generated ${collectiveInsightsGenerated} collective insights`
+        );
       } catch (error) {
         const errorMsg = `Failed to generate collective insights: ${error instanceof Error ? error.message : 'Unknown error'}`;
         Logger.error(errorMsg);
@@ -213,7 +197,9 @@ export class TradingOrchestratorService {
     // Log summary
     Logger.section('Session Complete');
     Logger.info(`Duration: ${(sessionResult.durationMs / 1000).toFixed(1)}s`);
-    Logger.info(`Agents: ${successfulAgents}/${agentResults.length} successful`);
+    Logger.info(
+      `Agents: ${successfulAgents}/${agentResults.length} successful`
+    );
     if (collectiveInsightsGenerated > 0) {
       Logger.info(`Collective insights: ${collectiveInsightsGenerated}`);
     }
@@ -227,9 +213,6 @@ export class TradingOrchestratorService {
     return sessionResult;
   }
 
-  /**
-   * Run a single agent's trading session
-   */
   private async runSingleAgent(
     trader: TraderAgent,
     agentName: string,
@@ -237,11 +220,13 @@ export class TradingOrchestratorService {
     dryRun: boolean
   ): Promise<AgentResult> {
     const startTime = new Date();
-    
+
     Logger.section(`${agentName}'s Trading Session`);
-    
+
     if (dryRun) {
-      Logger.info(`[DRY RUN] Would execute with prompt: ${prompt.substring(0, 100)}...`);
+      Logger.info(
+        `[DRY RUN] Would execute with prompt: ${prompt.substring(0, 100)}...`
+      );
       const endTime = new Date();
       return {
         agentName,
@@ -269,8 +254,9 @@ export class TradingOrchestratorService {
       };
     } catch (error) {
       const endTime = new Date();
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
       Logger.error(`${agentName} failed: ${errorMessage}`);
 
       return {
@@ -284,32 +270,27 @@ export class TradingOrchestratorService {
     }
   }
 
-  /**
-   * Send a Pushover notification with session summary
-   */
   private async sendSessionNotification(result: SessionResult): Promise<void> {
     const emoji = result.failedAgents === 0 ? '✅' : '⚠️';
-    const status = result.failedAgents === 0 ? 'Complete' : 'Completed with errors';
-    
+    const status =
+      result.failedAgents === 0 ? 'Complete' : 'Completed with errors';
+
     const message = [
       `${emoji} Trading Session ${status}`,
       ``,
       `Duration: ${(result.durationMs / 1000 / 60).toFixed(1)} min`,
       `Agents: ${result.successfulAgents}/${result.totalAgents} successful`,
-      result.collectiveInsightsGenerated > 0 
-        ? `Insights: ${result.collectiveInsightsGenerated} generated` 
+      result.collectiveInsightsGenerated > 0
+        ? `Insights: ${result.collectiveInsightsGenerated} generated`
         : '',
-      result.errors.length > 0 
-        ? `Errors: ${result.errors.length}` 
-        : '',
-    ].filter(Boolean).join('\n');
+      result.errors.length > 0 ? `Errors: ${result.errors.length}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     await this.pushoverService.sendNotification(message);
   }
 
-  /**
-   * Generate a unique session ID
-   */
   private generateSessionId(): string {
     const now = new Date();
     const date = now.toISOString().split('T')[0].replace(/-/g, '');
@@ -317,23 +298,14 @@ export class TradingOrchestratorService {
     return `session_${date}_${time}`;
   }
 
-  /**
-   * Sleep helper
-   */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Get list of available agents
-   */
   getAvailableAgents(): string[] {
     return Array.from(this.traders.keys());
   }
 
-  /**
-   * Get default prompt for an agent
-   */
   getDefaultPrompt(agentName: string): string | undefined {
     return DAILY_PROMPTS[agentName.toLowerCase()];
   }
