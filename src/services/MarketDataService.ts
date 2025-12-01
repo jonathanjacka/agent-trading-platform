@@ -1,9 +1,73 @@
 import { restClient } from '@massive.com/client-js';
 import { Logger } from '../utils/logger.js';
 
+class RateLimiter {
+  private tokens: number;
+  private lastRefill: number;
+  private readonly maxTokens: number;
+  private readonly refillIntervalMs: number;
+
+  constructor(maxTokens: number = 5, refillIntervalMs: number = 60000) {
+    this.maxTokens = maxTokens;
+    this.tokens = maxTokens;
+    this.refillIntervalMs = refillIntervalMs;
+    this.lastRefill = Date.now();
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsed = now - this.lastRefill;
+
+    if (elapsed >= this.refillIntervalMs) {
+      // Full refill after interval passes
+      this.tokens = this.maxTokens;
+      this.lastRefill = now;
+      Logger.info(`[RateLimiter] Tokens refilled to ${this.maxTokens}`);
+    }
+  }
+
+  async acquire(): Promise<void> {
+    this.refill();
+
+    if (this.tokens > 0) {
+      this.tokens--;
+      Logger.info(
+        `[RateLimiter] Token acquired. Remaining: ${this.tokens}/${this.maxTokens}`
+      );
+      return;
+    }
+
+    // No tokens available - wait for refill
+    const waitTime = this.refillIntervalMs - (Date.now() - this.lastRefill);
+    Logger.warn(
+      `[RateLimiter] Rate limit reached. Waiting ${Math.ceil(waitTime / 1000)}s...`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
+    this.refill();
+    this.tokens--;
+    Logger.info(
+      `[RateLimiter] Token acquired after wait. Remaining: ${this.tokens}/${this.maxTokens}`
+    );
+  }
+
+  getStatus(): { tokens: number; maxTokens: number; msUntilRefill: number } {
+    this.refill();
+    return {
+      tokens: this.tokens,
+      maxTokens: this.maxTokens,
+      msUntilRefill: Math.max(
+        0,
+        this.refillIntervalMs - (Date.now() - this.lastRefill)
+      ),
+    };
+  }
+}
+
 export class MarketDataService {
   private client: any;
   private apiKey: string;
+  private rateLimiter: RateLimiter;
   private tickerCache: Map<
     string,
     {
@@ -11,7 +75,7 @@ export class MarketDataService {
       timestamp: number;
     }
   > = new Map();
-  private CACHE_TTL = 60 * 60 * 1000; // 1 hour (ticker data updates daily anyway)
+  private CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (data updates EOD only)
 
   constructor(apiKey: string) {
     if (!apiKey) {
@@ -19,11 +83,21 @@ export class MarketDataService {
     }
 
     this.apiKey = apiKey;
+    this.rateLimiter = new RateLimiter(5, 60000); // 5 calls per 60 seconds
     this.client = restClient(apiKey, 'https://api.massive.com', {
       pagination: false, // Disabled to avoid auto-fetching all pages (rate limit friendly)
     });
 
-    Logger.info('MarketDataService initialized (Free Tier)');
+    Logger.info(
+      'MarketDataService initialized (Free Tier) - 24hr cache, 5/min rate limit'
+    );
+  }
+
+  /**
+   * Get rate limiter status (useful for monitoring)
+   */
+  getRateLimitStatus() {
+    return this.rateLimiter.getStatus();
   }
 
   private getCachedTicker(symbol: string) {
@@ -59,6 +133,7 @@ export class MarketDataService {
       // Try cache first
       let response = this.getCachedTicker(symbol);
       if (!response) {
+        await this.rateLimiter.acquire(); // Rate limit API calls
         response = await this.client.getTicker(symbol);
         this.setCachedTicker(symbol, response);
       }
@@ -113,6 +188,7 @@ export class MarketDataService {
   > {
     try {
       Logger.info(`Fetching news for ${symbol} (limit: ${limit})`);
+      await this.rateLimiter.acquire(); // Rate limit API calls
       const response = await this.client.listNews({
         ticker: symbol,
         limit: Math.min(limit, 1000),
@@ -155,6 +231,7 @@ export class MarketDataService {
       // Try cache first
       let response = this.getCachedTicker(symbol);
       if (!response) {
+        await this.rateLimiter.acquire(); // Rate limit API calls
         response = await this.client.getTicker(symbol);
         this.setCachedTicker(symbol, response);
       }
@@ -184,6 +261,7 @@ export class MarketDataService {
   async searchTickers(query: string, limit: number = 10): Promise<any[]> {
     try {
       Logger.info(`Searching tickers for: ${query}`);
+      await this.rateLimiter.acquire(); // Rate limit API calls
       const response = await this.client.listTickers({
         search: query,
         limit,
