@@ -1,6 +1,7 @@
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { MemoryService } from './MemoryService.js';
 import { PushoverService } from './PushoverService.js';
+import { DatabaseService } from './DatabaseService.js';
 import { Logger } from '../utils/logger.js';
 
 export interface AgentResult {
@@ -92,13 +93,18 @@ Focus on systematic diversification and risk management across market conditions
 export class TradingOrchestratorService {
   private memoryService: MemoryService;
   private pushoverService: PushoverService;
+  private db: DatabaseService;
 
   constructor(private traders: Map<string, TraderAgent>) {
     this.memoryService = MemoryService.getInstance();
     this.pushoverService = new PushoverService();
+    this.db = DatabaseService.getInstance();
   }
 
-  async runDailySession(options: SessionOptions = {}): Promise<SessionResult> {
+  async runDailySession(
+    options: SessionOptions = {},
+    jobName: string = 'manual'
+  ): Promise<SessionResult> {
     const {
       agents = Array.from(this.traders.keys()),
       delayBetweenAgentsMs = 90_000, // 90 seconds default
@@ -111,6 +117,11 @@ export class TradingOrchestratorService {
     const startTime = new Date();
     const agentResults: AgentResult[] = [];
     const errors: string[] = [];
+
+    // Log session start to database (unless dry run)
+    if (!dryRun) {
+      this.db.createSchedulerRun(sessionId, jobName);
+    }
 
     Logger.section(`Trading Session ${sessionId}`);
     Logger.info(`Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}`);
@@ -193,6 +204,21 @@ export class TradingOrchestratorService {
       collectiveInsightsGenerated,
       errors,
     };
+
+    // Update session in database (unless dry run)
+    if (!dryRun) {
+      this.db.updateSchedulerRun(sessionId, {
+        status: failedAgents === 0 ? 'success' : 'failure',
+        completedAt: endTime.toISOString(),
+        totalAgents: agentResults.length,
+        successfulAgents,
+        failedAgents,
+        collectiveInsightsGenerated,
+        durationMs: sessionResult.durationMs,
+        errorMessage: errors.length > 0 ? errors.join('; ') : undefined,
+        resultsJson: JSON.stringify(sessionResult),
+      });
+    }
 
     // Log summary
     Logger.section('Session Complete');

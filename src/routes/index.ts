@@ -5,16 +5,21 @@ import { AccountService } from '../services/AccountService.js';
 import { TradeLogService } from '../services/TradeLogService.js';
 import { DatabaseService } from '../services/DatabaseService.js';
 import { PushoverService } from '../services/PushoverService.js';
+import { SchedulerService } from '../services/SchedulerService.js';
+import { TradingOrchestratorService } from '../services/TradingOrchestratorService.js';
 import { createTraderRoutes } from './traders.js';
 import { createPortfolioRoutes } from './portfolio.js';
 import { createTransactionRoutes } from './transactions.js';
 import { createAnalyticsRoutes } from './analytics.js';
 import { createResearchRoutes } from './research.js';
+import { createSchedulerRoutes } from './scheduler.js';
 
 export function createRoutes(
   researcherAgent: ResearcherAgent,
   traders: Map<string, TraderAgent>,
-  accountService: AccountService
+  accountService: AccountService,
+  scheduler?: SchedulerService,
+  orchestrator?: TradingOrchestratorService
 ): Router {
   const db = DatabaseService.getInstance();
   const tradeLogService = new TradeLogService(db);
@@ -57,6 +62,14 @@ export function createRoutes(
   router.use('/api/portfolio', createPortfolioRoutes(accountService));
   router.use('/api/transactions', createTransactionRoutes(accountService));
   router.use('/api/analytics', createAnalyticsRoutes(tradeLogService));
+
+  // Mount scheduler routes if scheduler is provided
+  if (scheduler && orchestrator) {
+    router.use(
+      '/api/scheduler',
+      createSchedulerRoutes(scheduler, orchestrator)
+    );
+  }
 
   return router;
 }
