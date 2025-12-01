@@ -1,24 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SchedulerService, SchedulerConfig } from './SchedulerService.js';
-import { TradingOrchestratorService, SessionResult } from './TradingOrchestratorService.js';
+import {
+  TradingOrchestratorService,
+  SessionResult,
+} from './TradingOrchestratorService.js';
 
 // Mock the orchestrator
-const createMockOrchestrator = () => ({
-  runDailySession: vi.fn().mockResolvedValue({
-    sessionId: 'test-session',
-    startTime: new Date(),
-    endTime: new Date(),
-    durationMs: 1000,
-    agentResults: [],
-    totalAgents: 4,
-    successfulAgents: 4,
-    failedAgents: 0,
-    collectiveInsightsGenerated: 2,
-    errors: [],
-  } as SessionResult),
-  getAvailableAgents: vi.fn(() => ['leonardo', 'michelangelo', 'raphael', 'donatello']),
-  getDefaultPrompt: vi.fn((name: string) => `Prompt for ${name}`),
-}) as unknown as TradingOrchestratorService;
+const createMockOrchestrator = () =>
+  ({
+    runDailySession: vi.fn().mockResolvedValue({
+      sessionId: 'test-session',
+      startTime: new Date(),
+      endTime: new Date(),
+      durationMs: 1000,
+      agentResults: [],
+      totalAgents: 4,
+      successfulAgents: 4,
+      failedAgents: 0,
+      collectiveInsightsGenerated: 2,
+      errors: [],
+    } as SessionResult),
+    getAvailableAgents: vi.fn(() => [
+      'leonardo',
+      'michelangelo',
+      'raphael',
+      'donatello',
+    ]),
+    getDefaultPrompt: vi.fn((name: string) => `Prompt for ${name}`),
+  }) as unknown as TradingOrchestratorService;
 
 describe('SchedulerService', () => {
   let scheduler: SchedulerService;
@@ -187,7 +196,9 @@ describe('SchedulerService', () => {
     });
 
     it('should handle orchestrator errors gracefully', async () => {
-      mockOrchestrator.runDailySession = vi.fn().mockRejectedValue(new Error('API Error'));
+      mockOrchestrator.runDailySession = vi
+        .fn()
+        .mockRejectedValue(new Error('API Error'));
 
       scheduler = new SchedulerService(mockOrchestrator, { enabled: true });
       scheduler.start();

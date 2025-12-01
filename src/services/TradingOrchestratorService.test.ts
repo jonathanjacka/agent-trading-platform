@@ -250,7 +250,7 @@ describe('TradingOrchestratorService', () => {
     it('should create scheduler run in database', async () => {
       // Re-create orchestrator after db reset to share the same instance
       orchestrator = new TradingOrchestratorService(traders);
-      
+
       const options: SessionOptions = {
         agents: ['leonardo'],
         delayBetweenAgentsMs: 0,
@@ -289,7 +289,7 @@ describe('TradingOrchestratorService', () => {
     it('should store full results JSON', async () => {
       // Re-create orchestrator after db reset to share the same instance
       orchestrator = new TradingOrchestratorService(traders);
-      
+
       const options: SessionOptions = {
         agents: ['leonardo'],
         delayBetweenAgentsMs: 0,
