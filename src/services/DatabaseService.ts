@@ -97,6 +97,23 @@ export interface CollectiveInsight {
   tags?: string; // JSON array
 }
 
+export interface SchedulerRun {
+  id: number;
+  session_id: string;
+  job_name: string;
+  started_at: string;
+  completed_at: string | null;
+  status: 'running' | 'success' | 'failure';
+  total_agents: number;
+  successful_agents: number;
+  failed_agents: number;
+  total_trades: number;
+  collective_insights_generated: number;
+  duration_ms: number | null;
+  error_message: string | null;
+  results_json: string | null; // JSON of full SessionResult
+}
+
 export class DatabaseService {
   private db: Database.Database;
   private static instance: DatabaseService;
@@ -305,6 +322,36 @@ export class DatabaseService {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_collective_insights_confidence 
       ON collective_insights(confidence DESC)
+    `);
+
+    // Scheduler runs table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS scheduler_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL UNIQUE,
+        job_name TEXT NOT NULL,
+        started_at TEXT NOT NULL DEFAULT (datetime('now')),
+        completed_at TEXT,
+        status TEXT NOT NULL DEFAULT 'running',
+        total_agents INTEGER NOT NULL DEFAULT 0,
+        successful_agents INTEGER NOT NULL DEFAULT 0,
+        failed_agents INTEGER NOT NULL DEFAULT 0,
+        total_trades INTEGER NOT NULL DEFAULT 0,
+        collective_insights_generated INTEGER NOT NULL DEFAULT 0,
+        duration_ms INTEGER,
+        error_message TEXT,
+        results_json TEXT
+      )
+    `);
+
+    // Create indexes for scheduler_runs
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_scheduler_runs_started 
+      ON scheduler_runs(started_at DESC)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_scheduler_runs_status 
+      ON scheduler_runs(status)
     `);
   }
 
@@ -924,12 +971,143 @@ export class DatabaseService {
     stmt.run(insightId);
   }
 
+  // Scheduler runs operations
+  public createSchedulerRun(sessionId: string, jobName: string): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO scheduler_runs (session_id, job_name, status)
+      VALUES (?, ?, 'running')
+    `);
+    const result = stmt.run(sessionId, jobName);
+    return result.lastInsertRowid as number;
+  }
+
+  public updateSchedulerRun(
+    sessionId: string,
+    updates: {
+      status?: 'running' | 'success' | 'failure';
+      completedAt?: string;
+      totalAgents?: number;
+      successfulAgents?: number;
+      failedAgents?: number;
+      totalTrades?: number;
+      collectiveInsightsGenerated?: number;
+      durationMs?: number;
+      errorMessage?: string;
+      resultsJson?: string;
+    }
+  ): void {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.status !== undefined) {
+      fields.push('status = ?');
+      values.push(updates.status);
+    }
+    if (updates.completedAt !== undefined) {
+      fields.push('completed_at = ?');
+      values.push(updates.completedAt);
+    }
+    if (updates.totalAgents !== undefined) {
+      fields.push('total_agents = ?');
+      values.push(updates.totalAgents);
+    }
+    if (updates.successfulAgents !== undefined) {
+      fields.push('successful_agents = ?');
+      values.push(updates.successfulAgents);
+    }
+    if (updates.failedAgents !== undefined) {
+      fields.push('failed_agents = ?');
+      values.push(updates.failedAgents);
+    }
+    if (updates.totalTrades !== undefined) {
+      fields.push('total_trades = ?');
+      values.push(updates.totalTrades);
+    }
+    if (updates.collectiveInsightsGenerated !== undefined) {
+      fields.push('collective_insights_generated = ?');
+      values.push(updates.collectiveInsightsGenerated);
+    }
+    if (updates.durationMs !== undefined) {
+      fields.push('duration_ms = ?');
+      values.push(updates.durationMs);
+    }
+    if (updates.errorMessage !== undefined) {
+      fields.push('error_message = ?');
+      values.push(updates.errorMessage);
+    }
+    if (updates.resultsJson !== undefined) {
+      fields.push('results_json = ?');
+      values.push(updates.resultsJson);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(sessionId);
+    const stmt = this.db.prepare(`
+      UPDATE scheduler_runs 
+      SET ${fields.join(', ')} 
+      WHERE session_id = ?
+    `);
+    stmt.run(...values);
+  }
+
+  public getSchedulerRun(sessionId: string): SchedulerRun | undefined {
+    const stmt = this.db.prepare(
+      'SELECT * FROM scheduler_runs WHERE session_id = ?'
+    );
+    return stmt.get(sessionId) as SchedulerRun | undefined;
+  }
+
+  public getSchedulerRuns(
+    options: {
+      limit?: number;
+      status?: 'running' | 'success' | 'failure';
+      jobName?: string;
+    } = {}
+  ): SchedulerRun[] {
+    const { limit = 50, status, jobName } = options;
+
+    let query = 'SELECT * FROM scheduler_runs WHERE 1=1';
+    const params: any[] = [];
+
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+    if (jobName) {
+      query += ' AND job_name = ?';
+      params.push(jobName);
+    }
+
+    query += ' ORDER BY started_at DESC LIMIT ?';
+    params.push(limit);
+
+    const stmt = this.db.prepare(query);
+    return stmt.all(...params) as SchedulerRun[];
+  }
+
+  public getLatestSchedulerRun(jobName?: string): SchedulerRun | undefined {
+    let query = 'SELECT * FROM scheduler_runs';
+    const params: any[] = [];
+
+    if (jobName) {
+      query += ' WHERE job_name = ?';
+      params.push(jobName);
+    }
+
+    query += ' ORDER BY started_at DESC LIMIT 1';
+
+    const stmt = this.db.prepare(query);
+    return stmt.get(...params) as SchedulerRun | undefined;
+  }
+
   // Utility operations
   public close(): void {
     this.db.close();
   }
 
   public resetDatabase(): void {
+    this.db.exec('DELETE FROM scheduler_runs');
     this.db.exec('DELETE FROM collective_insights');
     this.db.exec('DELETE FROM agent_memory');
     this.db.exec('DELETE FROM trade_logs');

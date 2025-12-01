@@ -8,6 +8,8 @@ import { MarketDataService } from './services/MarketDataService.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
 import { DatabaseService } from './services/DatabaseService.js';
 import { AccountService } from './services/AccountService.js';
+import { TradingOrchestratorService } from './services/TradingOrchestratorService.js';
+import { SchedulerService } from './services/SchedulerService.js';
 import { createRoutes } from './routes/index.js';
 
 const app = express();
@@ -135,12 +137,47 @@ const traders = new Map<string, TraderAgent>([
   ['donatello', donatelloAgent],
 ]);
 
-const routes = createRoutes(researcherAgent, traders, accountService);
+// Create orchestrator and scheduler
+const orchestrator = new TradingOrchestratorService(traders);
+const scheduler = new SchedulerService(orchestrator, {
+  enabled: process.env.ENABLE_SCHEDULER === 'true',
+  tradingSchedule: process.env.TRADING_SCHEDULE || '0 6 * * 1-5', // Default: 6 AM UTC, Mon-Fri
+  timezone: process.env.SCHEDULER_TIMEZONE || 'UTC',
+});
+
+const routes = createRoutes(
+  researcherAgent,
+  traders,
+  accountService,
+  scheduler,
+  orchestrator
+);
 app.use(routes);
 
 app.listen(PORT, () => {
   Logger.section('Trading Platform Server');
   Logger.success(`Server running on http://localhost:${PORT}`);
+
+  // Start scheduler if enabled
+  if (process.env.ENABLE_SCHEDULER === 'true') {
+    scheduler.start();
+    Logger.success('Automated trading scheduler started');
+  } else {
+    Logger.info('Scheduler disabled (set ENABLE_SCHEDULER=true to enable)');
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  Logger.info('SIGTERM received, shutting down...');
+  scheduler.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  Logger.info('SIGINT received, shutting down...');
+  scheduler.stop();
+  process.exit(0);
 });
 
 export default app;
