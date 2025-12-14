@@ -13,6 +13,7 @@ import { createTransactionRoutes } from './transactions.js';
 import { createAnalyticsRoutes } from './analytics.js';
 import { createResearchRoutes } from './research.js';
 import { createSchedulerRoutes } from './scheduler.js';
+import { requireApiKey } from '../middleware/auth.js';
 
 export function createRoutes(
   researcherAgent: ResearcherAgent,
@@ -38,23 +39,27 @@ export function createRoutes(
     });
   });
 
-  // Test Pushover notification
-  router.post('/test-notification', async (req: Request, res: Response) => {
-    try {
-      const success = await pushoverService.sendTestNotification();
-      res.json({
-        success,
-        message: success
-          ? 'Test notification sent successfully!'
-          : 'Pushover is disabled or failed to send',
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
+  // Test Pushover notification (protected)
+  router.post(
+    '/test-notification',
+    requireApiKey,
+    async (req: Request, res: Response) => {
+      try {
+        const success = await pushoverService.sendTestNotification();
+        res.json({
+          success,
+          message: success
+            ? 'Test notification sent successfully!'
+            : 'Pushover is disabled or failed to send',
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     }
-  });
+  );
 
   // Mount sub-routes
   router.use('/api/research', createResearchRoutes(researcherAgent));

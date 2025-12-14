@@ -4,6 +4,12 @@ import 'dotenv/config';
 import { TraderAgent } from './agents/TraderAgent.js';
 import { ResearcherAgent } from './agents/ResearcherAgent.js';
 import { Logger } from './utils/logger.js';
+import {
+  standardLimiter,
+  globalErrorHandler,
+  notFoundHandler,
+  setupProcessErrorHandlers,
+} from './middleware/index.js';
 import { MarketDataService } from './services/MarketDataService.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
 import { DatabaseService } from './services/DatabaseService.js';
@@ -15,14 +21,34 @@ import { createRoutes } from './routes/index.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.CLIENT_URL, // Netlify URL
+].filter(Boolean) as string[];
+
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
 
 app.use(express.json());
+
+// Apply rate limiting to all requests
+app.use(standardLimiter);
+
+// Setup process-level error handlers
+setupProcessErrorHandlers();
+
+// Log environment
+const isProduction = process.env.NODE_ENV === 'production';
+Logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+if (!process.env.API_SECRET && isProduction) {
+  Logger.warn('API_SECRET not set - API authentication disabled!');
+}
 
 const apiKey = process.env.POLY_API_KEY;
 if (!apiKey) {
@@ -153,6 +179,10 @@ const routes = createRoutes(
   orchestrator
 );
 app.use(routes);
+
+// Error handling (must be after routes)
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
   Logger.section('Trading Platform Server');

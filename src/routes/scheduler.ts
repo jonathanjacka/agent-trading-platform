@@ -3,6 +3,7 @@ import { SchedulerService } from '../services/SchedulerService.js';
 import { TradingOrchestratorService } from '../services/TradingOrchestratorService.js';
 import { DatabaseService } from '../services/DatabaseService.js';
 import { Logger } from '../utils/logger.js';
+import { requireApiKey, strictLimiter } from '../middleware/index.js';
 
 export function createSchedulerRoutes(
   scheduler: SchedulerService,
@@ -12,7 +13,7 @@ export function createSchedulerRoutes(
   const db = DatabaseService.getInstance();
 
   /**
-   * GET /api/scheduler/status
+   * GET /api/scheduler/status (public - read only)
    * Get scheduler status and job information
    */
   router.get('/status', (req: Request, res: Response) => {
@@ -48,10 +49,10 @@ export function createSchedulerRoutes(
   });
 
   /**
-   * POST /api/scheduler/toggle
+   * POST /api/scheduler/toggle (protected)
    * Enable or disable the scheduler
    */
-  router.post('/toggle', (req: Request, res: Response) => {
+  router.post('/toggle', requireApiKey, (req: Request, res: Response) => {
     try {
       const { enabled } = req.body;
 
@@ -79,46 +80,51 @@ export function createSchedulerRoutes(
   });
 
   /**
-   * POST /api/scheduler/run-now
+   * POST /api/scheduler/run-now (protected + strict rate limit)
    * Manually trigger a trading session immediately
    */
-  router.post('/run-now', async (req: Request, res: Response) => {
-    try {
-      const { agents, dryRun = false } = req.body;
+  router.post(
+    '/run-now',
+    requireApiKey,
+    strictLimiter,
+    async (req: Request, res: Response) => {
+      try {
+        const { agents, dryRun = false } = req.body;
 
-      Logger.info(
-        `Manual trading session requested (dryRun: ${dryRun}, agents: ${agents || 'all'})`
-      );
+        Logger.info(
+          `Manual trading session requested (dryRun: ${dryRun}, agents: ${agents || 'all'})`
+        );
 
-      // Run the session (this may take several minutes)
-      const result = await orchestrator.runDailySession(
-        {
-          agents,
-          dryRun,
-        },
-        'manual-trigger'
-      );
+        // Run the session (this may take several minutes)
+        const result = await orchestrator.runDailySession(
+          {
+            agents,
+            dryRun,
+          },
+          'manual-trigger'
+        );
 
-      res.json({
-        success: true,
-        result: {
-          sessionId: result.sessionId,
-          durationMs: result.durationMs,
-          totalAgents: result.totalAgents,
-          successfulAgents: result.successfulAgents,
-          failedAgents: result.failedAgents,
-          collectiveInsightsGenerated: result.collectiveInsightsGenerated,
-          errors: result.errors,
-        },
-      });
-    } catch (error) {
-      Logger.error('Manual trading session failed', error);
-      res.status(500).json({
-        error: 'Trading session failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
+        res.json({
+          success: true,
+          result: {
+            sessionId: result.sessionId,
+            durationMs: result.durationMs,
+            totalAgents: result.totalAgents,
+            successfulAgents: result.successfulAgents,
+            failedAgents: result.failedAgents,
+            collectiveInsightsGenerated: result.collectiveInsightsGenerated,
+            errors: result.errors,
+          },
+        });
+      } catch (error) {
+        Logger.error('Manual trading session failed', error);
+        res.status(500).json({
+          error: 'Trading session failed',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     }
-  });
+  );
 
   /**
    * GET /api/scheduler/history
