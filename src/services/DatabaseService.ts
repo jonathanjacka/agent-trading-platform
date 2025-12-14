@@ -118,14 +118,19 @@ export class DatabaseService {
   private db: Database.Database;
   private static instance: DatabaseService;
 
-  private constructor(dbPath: string = './data/trading.db') {
+  private constructor(dbPath?: string) {
+    // Use DATABASE_PATH env var, or fallback to ./data/trading.db
+    const finalPath =
+      dbPath || process.env.DATABASE_PATH || './data/trading.db';
+
     // Ensure data directory exists
-    const dir = path.dirname(dbPath);
+    const dir = path.dirname(finalPath);
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
 
-    this.db = new Database(dbPath);
+    console.log(`[DatabaseService] Opening database at: ${finalPath}`);
+    this.db = new Database(finalPath);
     this.db.pragma('journal_mode = WAL'); // Better concurrency
     this.initializeTables();
   }
