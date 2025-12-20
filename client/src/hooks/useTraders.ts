@@ -5,6 +5,6 @@ export const useTraders = () => {
   return useQuery({
     queryKey: ['traders'],
     queryFn: tradersApi.getAll,
-    staleTime: 60000, // 1 minute
+    staleTime: 5 * 60 * 1000, // 5 minutes - traders list rarely changes
   });
 };
