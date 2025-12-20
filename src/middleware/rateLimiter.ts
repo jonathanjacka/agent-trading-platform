@@ -3,11 +3,13 @@ import { Logger } from '../utils/logger.js';
 
 /**
  * Standard rate limiter for general API endpoints
- * 100 requests per 15 minutes per IP
+ * Very generous limits - primarily for abuse prevention, not throttling normal use
+ *
+ * Behind Railway's proxy, we need to use X-Forwarded-For header for real IP
  */
 export const standardLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 2000, // 2000 requests per 15 min (~2/second sustained)
   message: {
     error: 'Too many requests',
     message: 'Please try again later',
@@ -15,19 +17,33 @@ export const standardLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for health checks
+  skip: (req) => req.path === '/health' || req.path === '/api/health',
+  // Use X-Forwarded-For header when behind proxy
+  keyGenerator: (req) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    const realIp = Array.isArray(forwarded)
+      ? forwarded[0]
+      : forwarded?.split(',')[0]?.trim();
+    return realIp || req.ip || 'unknown';
+  },
   handler: (req, res, next, options) => {
-    Logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    const forwarded = req.headers['x-forwarded-for'];
+    const realIp = Array.isArray(forwarded)
+      ? forwarded[0]
+      : forwarded?.split(',')[0]?.trim();
+    Logger.warn(`Rate limit exceeded for IP: ${realIp || req.ip}`);
     res.status(429).json(options.message);
   },
 });
 
 /**
  * Strict rate limiter for expensive operations (AI trades)
- * 10 requests per 15 minutes per IP
+ * 30 requests per 15 minutes per IP - enough for active trading
  */
 export const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: 30,
   message: {
     error: 'Too many trade requests',
     message: 'Trade endpoints are limited to prevent abuse',
@@ -35,8 +51,21 @@ export const strictLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    const realIp = Array.isArray(forwarded)
+      ? forwarded[0]
+      : forwarded?.split(',')[0]?.trim();
+    return realIp || req.ip || 'unknown';
+  },
   handler: (req, res, next, options) => {
-    Logger.warn(`Strict rate limit exceeded for IP: ${req.ip} on ${req.path}`);
+    const forwarded = req.headers['x-forwarded-for'];
+    const realIp = Array.isArray(forwarded)
+      ? forwarded[0]
+      : forwarded?.split(',')[0]?.trim();
+    Logger.warn(
+      `Strict rate limit exceeded for IP: ${realIp || req.ip} on ${req.path}`
+    );
     res.status(429).json(options.message);
   },
 });
