@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  TradingOrchestratorService,
-  SessionOptions,
-} from './TradingOrchestratorService.js';
-import { TraderAgent } from '../agents/TraderAgent.js';
-import { DatabaseService } from './DatabaseService.js';
-import { MemoryService } from './MemoryService.js';
+import { TradingOrchestratorService, SessionOptions } from './index.js';
+import { TraderAgent } from '../../agents/TraderAgent.js';
+import { DatabaseService } from '../database/index.js';
+import { MemoryService } from '../memory/index.js';
 
 // Mock TraderAgent
 const createMockTrader = (name: string, shouldFail = false) => {
@@ -20,7 +17,7 @@ const createMockTrader = (name: string, shouldFail = false) => {
 };
 
 // Mock PushoverService as a class
-vi.mock('./PushoverService.js', () => ({
+vi.mock('../PushoverService.js', () => ({
   PushoverService: class MockPushoverService {
     sendNotification = vi.fn().mockResolvedValue(undefined);
   },

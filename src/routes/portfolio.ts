@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { AccountService } from '../services/AccountService.js';
+import { AccountService } from '../services/account/index.js';
 import { Logger } from '../utils/logger.js';
 
 export function createPortfolioRoutes(accountService: AccountService): Router {

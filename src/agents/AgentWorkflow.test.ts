@@ -1,9 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { ResearcherAgent } from '../agents/ResearcherAgent.js';
-import { AccountService } from '../services/AccountService.js';
+import { AccountService } from '../services/account/index.js';
 import { MarketDataService } from '../services/MarketDataService.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
+import { DatabaseService } from '../services/database/index.js';
+import { MemoryService } from '../services/memory/index.js';
 
 /**
  * Agent workflow tests verify that agents can complete full trading cycles
@@ -13,8 +15,6 @@ import { BraveSearchService } from '../services/BraveSearchService.js';
 // Mock external services
 vi.mock('../services/MarketDataService.js');
 vi.mock('../services/BraveSearchService.js');
-vi.mock('../services/DatabaseService.js');
-vi.mock('../services/MemoryService.js');
 
 // Mock the AI SDK to avoid real API calls
 vi.mock('ai', () => ({
@@ -31,6 +31,13 @@ describe('Agent Workflow Tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Reset singletons and use in-memory database
+    // @ts-ignore - Access private property for testing
+    DatabaseService.instance = undefined;
+    // @ts-ignore - Access private property for testing
+    MemoryService.instance = undefined;
+    DatabaseService.getInstance(':memory:');
 
     // Mock services with reasonable responses
     mockAccountService = {
@@ -76,6 +83,16 @@ describe('Agent Workflow Tests', () => {
       mockBraveSearch,
       'gpt-4o-mini'
     );
+  });
+
+  afterEach(() => {
+    // Clean up singletons
+    const db = DatabaseService.getInstance(':memory:');
+    db.close();
+    // @ts-ignore - Reset singleton for next test
+    DatabaseService.instance = undefined;
+    // @ts-ignore - Reset singleton for next test
+    MemoryService.instance = undefined;
   });
 
   describe('Agent Tool Availability', () => {
@@ -301,7 +318,7 @@ describe('ResearcherAgent Workflow', () => {
 
   describe('Research Tool Availability', () => {
     it('should have all research tools', () => {
-      const tools = (researcherAgent as any).getTools();
+      const tools = (researcherAgent as any).tools;
 
       expect(tools).toHaveProperty('searchFinancialNews');
       expect(tools).toHaveProperty('analyzeCompany');

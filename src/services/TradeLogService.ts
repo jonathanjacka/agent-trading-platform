@@ -1,5 +1,5 @@
-import { DatabaseService, TradeLog } from './DatabaseService.js';
-import { MemoryService } from './MemoryService.js';
+import { DatabaseService, TradeLog } from './database/index.js';
+import { MemoryService } from './memory/index.js';
 import { Logger } from '../utils/logger.js';
 
 export interface TradeLogData {

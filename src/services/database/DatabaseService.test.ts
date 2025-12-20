@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabaseService } from '../services/DatabaseService.js';
-import { MemoryService } from '../services/MemoryService.js';
-import { TradeLogService } from '../services/TradeLogService.js';
+import { DatabaseService } from './index.js';
+import { MemoryService } from '../memory/index.js';
+import { TradeLogService } from '../TradeLogService.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -269,7 +269,7 @@ describe('Database Service Integration', () => {
         content: 'AAPL trade was profitable',
         context: JSON.stringify({ symbol: 'AAPL', profit: 250 }),
         confidence: 0.7,
-        last_used_at: undefined,
+        last_used_at: null,
         use_count: 0,
         success_count: 0,
         failure_count: 0,
