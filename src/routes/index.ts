@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { ResearcherAgent } from '../agents/ResearcherAgent.js';
-import { AccountService } from '../services/AccountService.js';
+import { AccountService } from '../services/account/index.js';
 import { TradeLogService } from '../services/TradeLogService.js';
-import { DatabaseService } from '../services/DatabaseService.js';
+import { DatabaseService } from '../services/database/index.js';
 import { PushoverService } from '../services/PushoverService.js';
-import { SchedulerService } from '../services/SchedulerService.js';
-import { TradingOrchestratorService } from '../services/TradingOrchestratorService.js';
+import { SchedulerService } from '../services/scheduler/index.js';
+import { TradingOrchestratorService } from '../services/orchestrator/index.js';
 import { createTraderRoutes } from './traders.js';
 import { createPortfolioRoutes } from './portfolio.js';
 import { createTransactionRoutes } from './transactions.js';

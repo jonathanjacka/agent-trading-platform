@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TraderAgent } from '../agents/TraderAgent.js';
-import { AccountService } from '../services/AccountService.js';
+import { AccountService } from '../services/account/index.js';
 import { MarketDataService } from '../services/MarketDataService.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
 

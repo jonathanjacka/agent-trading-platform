@@ -14,10 +14,10 @@ import {
 } from './middleware/index.js';
 import { MarketDataService } from './services/MarketDataService.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
-import { DatabaseService } from './services/DatabaseService.js';
-import { AccountService } from './services/AccountService.js';
-import { TradingOrchestratorService } from './services/TradingOrchestratorService.js';
-import { SchedulerService } from './services/SchedulerService.js';
+import { DatabaseService } from './services/database/index.js';
+import { AccountService } from './services/account/index.js';
+import { TradingOrchestratorService } from './services/orchestrator/index.js';
+import { SchedulerService } from './services/scheduler/index.js';
 import { createRoutes } from './routes/index.js';
 
 const app = express();
@@ -170,11 +170,18 @@ const traders = new Map<string, TraderAgent>([
 
 // Create orchestrator and scheduler
 const orchestrator = new TradingOrchestratorService(traders);
-const scheduler = new SchedulerService(orchestrator, {
-  enabled: process.env.ENABLE_SCHEDULER === 'true',
-  tradingSchedule: process.env.TRADING_SCHEDULE || '0 6 * * 1-5', // Default: 6 AM UTC, Mon-Fri
-  timezone: process.env.SCHEDULER_TIMEZONE || 'UTC',
-});
+const scheduler = new SchedulerService(
+  orchestrator,
+  {
+    enabled: process.env.ENABLE_SCHEDULER === 'true',
+    tradingSchedule: process.env.TRADING_SCHEDULE || '0 6 * * 1-5', // Default: 6 AM UTC, Mon-Fri
+    intradaySchedule: process.env.INTRADAY_SCHEDULE || '30 10,14 * * 1-5', // Default: 10:30 AM, 2:30 PM ET
+    timezone: process.env.SCHEDULER_TIMEZONE || 'UTC',
+    enableIntraday: process.env.ENABLE_INTRADAY === 'true',
+  },
+  marketData, // Pass for market intelligence
+  braveSearch // Pass for market intelligence
+);
 
 const routes = createRoutes(
   researcherAgent,

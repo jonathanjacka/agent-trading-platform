@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { SchedulerService } from '../services/SchedulerService.js';
-import { TradingOrchestratorService } from '../services/TradingOrchestratorService.js';
-import { DatabaseService } from '../services/DatabaseService.js';
+import { SchedulerService } from '../services/scheduler/index.js';
+import { TradingOrchestratorService } from '../services/orchestrator/index.js';
+import { DatabaseService } from '../services/database/index.js';
 import { Logger } from '../utils/logger.js';
 import { requireApiKey, strictLimiter } from '../middleware/index.js';
 
@@ -16,17 +16,19 @@ export function createSchedulerRoutes(
    * GET /api/scheduler/status (public - read only)
    * Get scheduler status and job information
    */
-  router.get('/status', (req: Request, res: Response) => {
+  router.get('/status', async (req: Request, res: Response) => {
     try {
       const enabled = scheduler.isEnabled();
       const config = scheduler.getConfig();
       const jobs = scheduler.getJobStatuses();
       const latestRun = db.getLatestSchedulerRun();
+      const marketStatus = await scheduler.getMarketStatus();
 
       res.json({
         enabled,
         config,
         jobs,
+        marketStatus,
         latestRun: latestRun
           ? {
               sessionId: latestRun.session_id,
@@ -120,6 +122,54 @@ export function createSchedulerRoutes(
         Logger.error('Manual trading session failed', error);
         res.status(500).json({
           error: 'Trading session failed',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/scheduler/run-intraday (protected + strict rate limit)
+   * Manually trigger an intraday trading session with live market context
+   */
+  router.post(
+    '/run-intraday',
+    requireApiKey,
+    strictLimiter,
+    async (req: Request, res: Response) => {
+      try {
+        Logger.info('Manual intraday trading session requested');
+
+        // Check market status first
+        const marketStatus = await scheduler.getMarketStatus();
+
+        const result = await scheduler.triggerIntradayNow();
+
+        if (!result) {
+          return res.json({
+            success: false,
+            message: 'Session skipped - market may be closed',
+            marketStatus,
+          });
+        }
+
+        res.json({
+          success: true,
+          marketStatus,
+          result: {
+            sessionId: result.sessionId,
+            durationMs: result.durationMs,
+            totalAgents: result.totalAgents,
+            successfulAgents: result.successfulAgents,
+            failedAgents: result.failedAgents,
+            collectiveInsightsGenerated: result.collectiveInsightsGenerated,
+            errors: result.errors,
+          },
+        });
+      } catch (error) {
+        Logger.error('Intraday trading session failed', error);
+        res.status(500).json({
+          error: 'Intraday trading session failed',
           message: error instanceof Error ? error.message : 'Unknown error',
         });
       }

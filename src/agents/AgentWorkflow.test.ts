@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { ResearcherAgent } from '../agents/ResearcherAgent.js';
-import { AccountService } from '../services/AccountService.js';
+import { AccountService } from '../services/account/index.js';
 import { MarketDataService } from '../services/MarketDataService.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
 
@@ -301,7 +301,7 @@ describe('ResearcherAgent Workflow', () => {
 
   describe('Research Tool Availability', () => {
     it('should have all research tools', () => {
-      const tools = (researcherAgent as any).getTools();
+      const tools = (researcherAgent as any).tools;
 
       expect(tools).toHaveProperty('searchFinancialNews');
       expect(tools).toHaveProperty('analyzeCompany');

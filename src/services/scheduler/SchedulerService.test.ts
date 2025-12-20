@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SchedulerService, SchedulerConfig } from './SchedulerService.js';
+import { SchedulerService, SchedulerConfig } from './index.js';
 import {
   TradingOrchestratorService,
   SessionResult,
-} from './TradingOrchestratorService.js';
+} from '../orchestrator/index.js';
 
 // Mock the orchestrator
 const createMockOrchestrator = () =>
