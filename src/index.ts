@@ -8,7 +8,6 @@ import { TraderAgent } from './agents/TraderAgent.js';
 import { ResearcherAgent } from './agents/ResearcherAgent.js';
 import { Logger } from './utils/logger.js';
 import {
-  standardLimiter,
   globalErrorHandler,
   notFoundHandler,
   setupProcessErrorHandlers,
@@ -23,6 +22,9 @@ import { createRoutes } from './routes/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy (Railway, Render, etc.) for correct client IP detection
+app.set('trust proxy', 1);
 
 // CORS configuration
 const allowedOrigins = [
@@ -40,8 +42,8 @@ app.use(
 
 app.use(express.json());
 
-// Apply rate limiting to all requests
-app.use(standardLimiter);
+// Rate limiting is applied selectively to expensive endpoints (AI calls)
+// See routes/traders.ts and routes/research.ts for strictLimiter usage
 
 // Setup process-level error handlers
 setupProcessErrorHandlers();

@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { ResearcherAgent } from '../agents/ResearcherAgent.js';
 import { Logger } from '../utils/logger.js';
+import { strictLimiter } from '../middleware/index.js';
 
 export function createResearchRoutes(researcherAgent: ResearcherAgent): Router {
   const router = Router();
 
-  // Research endpoint
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', strictLimiter, async (req: Request, res: Response) => {
     try {
       const { query } = req.body;
 
