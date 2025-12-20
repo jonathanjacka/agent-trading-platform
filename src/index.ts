@@ -1,6 +1,9 @@
+import 'dotenv/config';
+// Telemetry must be imported before any AI SDK imports
+import { flushTelemetry } from './telemetry.js';
+
 import express from 'express';
 import cors from 'cors';
-import 'dotenv/config';
 import { TraderAgent } from './agents/TraderAgent.js';
 import { ResearcherAgent } from './agents/ResearcherAgent.js';
 import { Logger } from './utils/logger.js';
@@ -198,15 +201,17 @@ app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   Logger.info('SIGTERM received, shutting down...');
   scheduler.stop();
+  await flushTelemetry();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   Logger.info('SIGINT received, shutting down...');
   scheduler.stop();
+  await flushTelemetry();
   process.exit(0);
 });
 

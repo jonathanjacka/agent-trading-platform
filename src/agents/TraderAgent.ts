@@ -324,6 +324,14 @@ Current datetime: ${new Date().toISOString()}`;
       prompt,
       tools: this.getTools(),
       stopWhen: stepCountIs(20),
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: `trader-${this.name}`,
+        metadata: {
+          agentName: this.name,
+          agentType: 'trader',
+        },
+      },
     });
 
     Logger.traderAction(
