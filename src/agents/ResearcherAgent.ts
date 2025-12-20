@@ -217,6 +217,14 @@ Current datetime: ${new Date().toISOString()}`;
       prompt: query,
       tools: this.getTools(),
       stopWhen: stepCountIs(10),
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: 'researcher-agent',
+        metadata: {
+          agentType: 'researcher',
+          query,
+        },
+      },
     });
 
     Logger.researcherAction(
