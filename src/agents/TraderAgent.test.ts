@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { AccountService } from '../services/account/index.js';
 import { MarketDataService } from '../services/MarketDataService.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
+import { DatabaseService } from '../services/database/index.js';
+import { MemoryService } from '../services/memory/index.js';
 
 // Mock the services
 vi.mock('../services/AccountService.js');
 vi.mock('../services/MarketDataService.js');
 vi.mock('../services/BraveSearchService.js');
-vi.mock('../services/MemoryService.js');
 
 describe('TraderAgent Tools', () => {
   let traderAgent: TraderAgent;
@@ -19,6 +20,13 @@ describe('TraderAgent Tools', () => {
   beforeEach(() => {
     // Reset all mocks before each test
     vi.clearAllMocks();
+
+    // Reset singletons and use in-memory database
+    // @ts-ignore - Access private property for testing
+    DatabaseService.instance = undefined;
+    // @ts-ignore - Access private property for testing
+    MemoryService.instance = undefined;
+    DatabaseService.getInstance(':memory:');
 
     // Create mock instances
     mockAccountService = {
@@ -39,6 +47,16 @@ describe('TraderAgent Tools', () => {
       mockBraveSearch,
       'gpt-4o-mini'
     );
+  });
+
+  afterEach(() => {
+    // Clean up singletons
+    const db = DatabaseService.getInstance(':memory:');
+    db.close();
+    // @ts-ignore - Reset singleton for next test
+    DatabaseService.instance = undefined;
+    // @ts-ignore - Reset singleton for next test
+    MemoryService.instance = undefined;
   });
 
   describe('getPortfolio tool', () => {
