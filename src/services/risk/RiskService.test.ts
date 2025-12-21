@@ -761,3 +761,288 @@ describe('Risk Service Integration', () => {
     expect(approved.approved).toBe(true);
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// POSITION SIZING CALCULATOR TESTS
+// ═══════════════════════════════════════════════════════
+
+describe('PositionSizingCalculator (via RiskService)', () => {
+  let service: RiskService;
+
+  beforeEach(() => {
+    service = new RiskService();
+  });
+
+  describe('suggestPositionSize', () => {
+    it('should calculate correct position size for new position', () => {
+      const portfolio = createEmptyPortfolio(); // $10,000 cash
+      const result = service.suggestPositionSize('AAPL', 100, portfolio);
+
+      // With 10% min cash ($1,000 reserve), $9,000 available
+      // With 25% max position, max is $2,500
+      // Moderate strategy uses 75% = $1,875 = 18 shares
+      expect(result.canBuy).toBe(true);
+      expect(result.maxShares).toBe(25); // $2,500 / $100
+      expect(result.recommendedShares).toBe(18); // 75% of max
+      expect(result.limitingFactor).toBe('position_limit');
+    });
+
+    it('should respect cash constraint when cash is limiting factor', () => {
+      const portfolio: PortfolioData = {
+        cash: 2000,
+        holdings: [],
+        totalValue: 2000,
+        totalHoldingsValue: 0,
+      };
+
+      const result = service.suggestPositionSize('AAPL', 100, portfolio);
+
+      // 10% reserve = $200, available = $1,800
+      // 25% max position = $500
+      // Cash ($1,800) > position limit ($500), so position is limiting
+      expect(result.limitingFactor).toBe('position_limit');
+      expect(result.maxShares).toBe(5); // $500 / $100
+    });
+
+    it('should account for existing position', () => {
+      const portfolio: PortfolioData = {
+        cash: 5000,
+        holdings: [
+          {
+            symbol: 'AAPL',
+            quantity: 10,
+            avgPrice: 100,
+            currentPrice: 100,
+            currentValue: 1000,
+            gain: 0,
+            gainPercent: 0,
+          },
+        ],
+        totalValue: 6000,
+        totalHoldingsValue: 1000,
+      };
+
+      const result = service.suggestPositionSize('AAPL', 100, portfolio);
+
+      // Max position = 25% of $6,000 = $1,500
+      // Already have $1,000, so can add $500 more
+      expect(result.existingShares).toBe(10);
+      expect(result.existingValue).toBe(1000);
+      expect(result.maxShares).toBe(5); // $500 / $100
+      expect(result.postPurchaseShares).toBe(10 + result.recommendedShares);
+    });
+
+    it('should return canBuy=false when position at limit', () => {
+      const portfolio: PortfolioData = {
+        cash: 5000,
+        holdings: [
+          {
+            symbol: 'AAPL',
+            quantity: 30,
+            avgPrice: 100,
+            currentPrice: 100,
+            currentValue: 3000,
+            gain: 0,
+            gainPercent: 0,
+          },
+        ],
+        totalValue: 8000,
+        totalHoldingsValue: 3000,
+      };
+
+      const result = service.suggestPositionSize('AAPL', 100, portfolio);
+
+      // Current position is 37.5% (3000/8000), already over 25% limit
+      expect(result.canBuy).toBe(false);
+      expect(result.maxShares).toBe(0);
+      expect(result.reason).toContain('maximum');
+    });
+
+    it('should return canBuy=false when no cash available', () => {
+      const portfolio: PortfolioData = {
+        cash: 500, // 5% of total, below 10% reserve
+        holdings: [
+          {
+            symbol: 'MSFT',
+            quantity: 95,
+            avgPrice: 100,
+            currentPrice: 100,
+            currentValue: 9500,
+            gain: 0,
+            gainPercent: 0,
+          },
+        ],
+        totalValue: 10000,
+        totalHoldingsValue: 9500,
+      };
+
+      const result = service.suggestPositionSize('NEW', 100, portfolio);
+
+      expect(result.canBuy).toBe(false);
+      expect(result.reason).toContain('cash');
+    });
+
+    it('should use conservative strategy when specified', () => {
+      const portfolio = createEmptyPortfolio();
+
+      const moderate = service.suggestPositionSize(
+        'TEST',
+        100,
+        portfolio,
+        'moderate' as any
+      );
+      const conservative = service.suggestPositionSize(
+        'TEST',
+        100,
+        portfolio,
+        'conservative' as any
+      );
+
+      expect(conservative.recommendedShares).toBeLessThan(
+        moderate.recommendedShares
+      );
+      expect(conservative.strategy).toBe('conservative');
+    });
+
+    it('should use max_allowed strategy when specified', () => {
+      const portfolio = createEmptyPortfolio();
+
+      const moderate = service.suggestPositionSize(
+        'TEST',
+        100,
+        portfolio,
+        'moderate' as any
+      );
+      const maxAllowed = service.suggestPositionSize(
+        'TEST',
+        100,
+        portfolio,
+        'max_allowed' as any
+      );
+
+      expect(maxAllowed.recommendedShares).toBe(maxAllowed.maxShares);
+      expect(maxAllowed.recommendedShares).toBeGreaterThan(
+        moderate.recommendedShares
+      );
+    });
+
+    it('should provide accurate post-purchase projections', () => {
+      const portfolio: PortfolioData = {
+        cash: 5000,
+        holdings: [
+          {
+            symbol: 'AAPL',
+            quantity: 5,
+            avgPrice: 100,
+            currentPrice: 100,
+            currentValue: 500,
+            gain: 0,
+            gainPercent: 0,
+          },
+        ],
+        totalValue: 5500,
+        totalHoldingsValue: 500,
+      };
+
+      const result = service.suggestPositionSize('AAPL', 100, portfolio);
+
+      // Verify post-purchase math
+      const expectedPostValue =
+        result.existingValue + result.recommendedShares * 100;
+      expect(result.postPurchaseValue).toBe(expectedPostValue);
+      expect(result.postPurchaseShares).toBe(
+        result.existingShares + result.recommendedShares
+      );
+      expect(result.postPurchasePercent).toBeCloseTo(
+        (expectedPostValue / portfolio.totalValue) * 100,
+        1
+      );
+    });
+
+    it('should generate appropriate warnings', () => {
+      const portfolio: PortfolioData = {
+        cash: 1200, // 12% - close to 10% minimum
+        holdings: [
+          {
+            symbol: 'AAPL',
+            quantity: 88,
+            avgPrice: 100,
+            currentPrice: 100,
+            currentValue: 8800,
+            gain: 0,
+            gainPercent: 0,
+          },
+        ],
+        totalValue: 10000,
+        totalHoldingsValue: 8800,
+      };
+
+      const result = service.suggestPositionSize('NEW', 100, portfolio);
+
+      // Should warn about low cash
+      expect(result.warnings.some((w) => w.includes('low'))).toBe(true);
+    });
+
+    it('should work with new symbol not in portfolio', () => {
+      const portfolio = createTestPortfolio();
+      const result = service.suggestPositionSize('NEWSTOCK', 50, portfolio);
+
+      expect(result.symbol).toBe('NEWSTOCK');
+      expect(result.existingShares).toBe(0);
+      expect(result.existingValue).toBe(0);
+      expect(result.canBuy).toBe(true);
+    });
+
+    it('should handle expensive stocks correctly', () => {
+      const portfolio = createEmptyPortfolio(); // $10,000
+      const result = service.suggestPositionSize('BRK.A', 500000, portfolio);
+
+      // Max position value is $2,500, but one share costs $500,000
+      expect(result.canBuy).toBe(false);
+      expect(result.maxShares).toBe(0);
+      expect(result.reason).toContain('less than one share');
+    });
+
+    it('should include constraints in result', () => {
+      const portfolio = createTestPortfolio();
+      const result = service.suggestPositionSize('TEST', 100, portfolio);
+
+      expect(result.constraints.length).toBeGreaterThan(0);
+      expect(result.constraints.some((c) => c.includes('Cash'))).toBe(true);
+      expect(result.constraints.some((c) => c.includes('Position'))).toBe(true);
+    });
+  });
+
+  describe('position sizing with updated limits', () => {
+    it('should use updated limits for calculations', () => {
+      const portfolio = createEmptyPortfolio();
+
+      // Default max position is 25%
+      const before = service.suggestPositionSize('TEST', 100, portfolio);
+
+      // Increase max position to 50%
+      service.setRiskLimits({ maxPositionPercent: 50 });
+
+      const after = service.suggestPositionSize('TEST', 100, portfolio);
+
+      // Should allow more shares with higher limit
+      expect(after.maxShares).toBeGreaterThan(before.maxShares);
+    });
+
+    it('should respect updated min cash reserve', () => {
+      const portfolio = createEmptyPortfolio();
+
+      // Default min cash is 10%
+      const before = service.suggestPositionSize('TEST', 100, portfolio);
+
+      // Increase min cash to 30%
+      service.setRiskLimits({ minCashPercent: 30 });
+
+      const after = service.suggestPositionSize('TEST', 100, portfolio);
+
+      // Should allow fewer shares with higher cash reserve
+      // Before: $9,000 available, After: $7,000 available
+      expect(after.constraints.some((c) => c.includes('30%'))).toBe(true);
+    });
+  });
+});
