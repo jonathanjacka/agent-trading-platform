@@ -12,39 +12,62 @@ import { BraveSearchService } from '../services/BraveSearchService.js';
 import { AccountService } from '../services/account/index.js';
 import { MemoryService } from '../services/memory/index.js';
 import { MarketIntelligenceService } from '../services/marketIntelligence/index.js';
+import { RiskService } from '../services/risk/index.js';
 import {
   createTradingTools,
   createMarketTools,
   createMemoryTools,
+  createRiskTools,
 } from './tools/index.js';
 
 const TRADER_BASE_INSTRUCTIONS = `Your responsibilities:
 - Analyze market conditions using available research tools
 - Make informed trading decisions aligned with your strategy
-- Manage risk appropriately
+- Manage risk appropriately using risk management tools
 - Provide clear rationale for your decisions
 
 Available tools:
+
+RESEARCH & DISCOVERY:
 - researcher: Use this to gather market information and news
 - getMarketOverview: Get real-time market status, sentiment, and top movers
 - discoverStocks: Find new investment opportunities by theme (AI, EVs, etc.) or trending
 - getMarketMovers: Get today's top gainers and losers
+
+TRADING:
 - getPortfolio: Check current holdings and cash balance
 - buyStock: Execute a buy order
 - sellStock: Execute a sell order
+
+RISK MANAGEMENT:
+- getPortfolioRisk: Analyze overall portfolio risk, concentration, and get recommendations
+- getPositionRisk: Analyze risk for a specific position (stop loss, take profit levels)
+- evaluateTradeRisk: ALWAYS use before buying/selling to check if trade is safe
+- getRiskLimits: View current risk management limits
+
+MEMORY & LEARNING:
 - reviewMemories: Review your past trading experiences and lessons learned
 - reviewCollectiveLessons: Learn from insights discovered by other agents
 - recordLesson: Manually record an important insight or lesson
 
-Guidelines:
+Risk Management Guidelines:
+1. ALWAYS use evaluateTradeRisk before executing buyStock or sellStock
+2. Do not proceed with trades that have blockers
+3. Proceed with caution on trades with warnings
+4. Monitor position concentration - no single position should dominate
+5. Maintain minimum cash reserves for opportunities
+6. Use getPositionRisk to check stop loss and take profit levels
+
+Trading Guidelines:
 1. Start by checking getMarketOverview to understand current conditions
-2. Use discoverStocks to find opportunities beyond your training data
-3. Always research before making trading decisions
-4. Consider your strategy when evaluating opportunities
-5. Review your memories and collective lessons to learn from past experiences
-6. Record important insights when you discover patterns or lessons
-7. Explain your reasoning clearly
-8. Be decisive but not reckless`;
+2. Check getPortfolioRisk to assess current risk exposure
+3. Use discoverStocks to find opportunities beyond your training data
+4. Always research before making trading decisions
+5. Consider your strategy when evaluating opportunities
+6. Review your memories and collective lessons to learn from past experiences
+7. Record important insights when you discover patterns or lessons
+8. Explain your reasoning clearly
+9. Be decisive but not reckless`;
 
 export class TraderAgent {
   private modelName: string;
@@ -54,6 +77,7 @@ export class TraderAgent {
   private accountService: AccountService;
   private memoryService: MemoryService;
   private marketIntelligence: MarketIntelligenceService;
+  private riskService: RiskService;
   private currentPrompt: string | undefined;
 
   constructor(
@@ -69,6 +93,7 @@ export class TraderAgent {
     this.modelName = modelName;
     this.accountService = accountService;
     this.memoryService = MemoryService.getInstance();
+    this.riskService = new RiskService();
     this.marketIntelligence = new MarketIntelligenceService(
       marketData,
       braveSearch
@@ -109,11 +134,18 @@ Current datetime: ${new Date().toISOString()}`;
       agentName: this.name,
     });
 
+    const riskTools = createRiskTools({
+      accountService: this.accountService,
+      riskService: this.riskService,
+      agentName: this.name,
+    });
+
     return {
       researcher: this.researcherAgent.getAsTool(),
       ...tradingTools,
       ...marketTools,
       ...memoryTools,
+      ...riskTools,
     };
   }
 
