@@ -10,3 +10,4 @@ export {
 export { createTradingTools, type TradingToolsDeps } from './tradingTools.js';
 export { createMarketTools, type MarketToolsDeps } from './marketTools.js';
 export { createMemoryTools, type MemoryToolsDeps } from './memoryTools.js';
+export { createRiskTools, type RiskToolsDeps } from './riskTools.js';

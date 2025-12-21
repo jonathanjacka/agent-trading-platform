@@ -165,6 +165,26 @@ export const recordLessonInputSchema = z.object({
 });
 
 // ============================================================================
+// Risk Management Schemas
+// ============================================================================
+
+/** Position risk analysis input schema */
+export const positionRiskInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock symbol to analyze risk for'),
+});
+
+/** Trade risk evaluation input schema */
+export const evaluateTradeRiskInputSchema = z.object({
+  tradeType: z.enum(['BUY', 'SELL']).describe('Type of trade to evaluate'),
+  symbol: symbolSchema,
+  quantity: quantitySchema,
+  estimatedPrice: z
+    .number()
+    .positive()
+    .describe('Estimated price per share for the trade'),
+});
+
+// ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
 
@@ -177,3 +197,7 @@ export type TradeInput = z.infer<typeof tradeInputSchema>;
 export type ReviewMemoriesInput = z.infer<typeof reviewMemoriesInputSchema>;
 export type ReviewInsightsInput = z.infer<typeof reviewInsightsInputSchema>;
 export type RecordLessonInput = z.infer<typeof recordLessonInputSchema>;
+export type PositionRiskInput = z.infer<typeof positionRiskInputSchema>;
+export type EvaluateTradeRiskInput = z.infer<
+  typeof evaluateTradeRiskInputSchema
+>;
