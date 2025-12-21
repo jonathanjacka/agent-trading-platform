@@ -13,11 +13,15 @@ import { AccountService } from '../services/account/index.js';
 import { MemoryService } from '../services/memory/index.js';
 import { MarketIntelligenceService } from '../services/marketIntelligence/index.js';
 import { RiskService } from '../services/risk/index.js';
+import { PerformanceAnalyticsService } from '../services/analytics/index.js';
+import { TradeLogService } from '../services/TradeLogService.js';
+import { DatabaseService } from '../services/database/index.js';
 import {
   createTradingTools,
   createMarketTools,
   createMemoryTools,
   createRiskTools,
+  createAnalyticsTools,
 } from './tools/index.js';
 
 const TRADER_BASE_INSTRUCTIONS = `Your responsibilities:
@@ -44,6 +48,11 @@ RISK MANAGEMENT:
 - getPositionRisk: Analyze risk for a specific position (stop loss, take profit levels)
 - evaluateTradeRisk: ALWAYS use before buying/selling to check if trade is safe
 - getRiskLimits: View current risk management limits
+- getPositionSizeRecommendation: Get how many shares you can safely buy
+
+PERFORMANCE ANALYTICS:
+- getPerformanceSummary: Review your trading performance (returns, win rate, drawdown)
+- getSymbolPerformance: See which stocks are your winners and losers
 
 MEMORY & LEARNING:
 - reviewMemories: Review your past trading experiences and lessons learned
@@ -57,6 +66,12 @@ Risk Management Guidelines:
 4. Monitor position concentration - no single position should dominate
 5. Maintain minimum cash reserves for opportunities
 6. Use getPositionRisk to check stop loss and take profit levels
+7. Use getPositionSizeRecommendation before buying to determine safe quantity
+
+Performance Review:
+1. Periodically use getPerformanceSummary to review your trading effectiveness
+2. Use getSymbolPerformance to identify which stocks work best for your strategy
+3. Learn from your win rate, drawdown, and profit factor metrics
 
 Trading Guidelines:
 1. Start by checking getMarketOverview to understand current conditions
@@ -78,6 +93,7 @@ export class TraderAgent {
   private memoryService: MemoryService;
   private marketIntelligence: MarketIntelligenceService;
   private riskService: RiskService;
+  private analyticsService: PerformanceAnalyticsService;
   private currentPrompt: string | undefined;
 
   constructor(
@@ -103,6 +119,11 @@ export class TraderAgent {
       braveSearch,
       modelName
     );
+
+    // Initialize analytics with a trade log service
+    const db = DatabaseService.getInstance();
+    const tradeLogService = new TradeLogService(db);
+    this.analyticsService = new PerformanceAnalyticsService(tradeLogService);
   }
 
   private getInstructions(): string {
@@ -140,12 +161,18 @@ Current datetime: ${new Date().toISOString()}`;
       agentName: this.name,
     });
 
+    const analyticsTools = createAnalyticsTools({
+      analyticsService: this.analyticsService,
+      agentName: this.name,
+    });
+
     return {
       researcher: this.researcherAgent.getAsTool(),
       ...tradingTools,
       ...marketTools,
       ...memoryTools,
       ...riskTools,
+      ...analyticsTools,
     };
   }
 
