@@ -202,6 +202,25 @@ export const positionSizingInputSchema = z.object({
 });
 
 // ============================================================================
+// Performance Analytics Schemas
+// ============================================================================
+
+/** Performance summary input schema */
+export const performanceSummaryInputSchema = z.object({
+  period: z
+    .enum(['day', 'week', 'month', 'quarter', 'year', 'all_time'])
+    .optional()
+    .describe(
+      'Time period for analysis. Defaults to all_time if not specified.'
+    ),
+  recentTradesLimit: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Number of recent trades to include. Defaults to 10.'),
+});
+
+// ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
 
@@ -219,3 +238,6 @@ export type EvaluateTradeRiskInput = z.infer<
   typeof evaluateTradeRiskInputSchema
 >;
 export type PositionSizingInput = z.infer<typeof positionSizingInputSchema>;
+export type PerformanceSummaryInput = z.infer<
+  typeof performanceSummaryInputSchema
+>;
