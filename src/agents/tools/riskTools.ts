@@ -6,11 +6,17 @@
 import { tool } from 'ai';
 import { Logger } from '../../utils/logger.js';
 import { AccountService } from '../../services/account/index.js';
-import { RiskService, type PortfolioData } from '../../services/risk/index.js';
+import {
+  RiskService,
+  SIZING_STRATEGY,
+  type PortfolioData,
+  type SizingStrategyValue,
+} from '../../services/risk/index.js';
 import {
   emptyInputSchema,
   positionRiskInputSchema,
   evaluateTradeRiskInputSchema,
+  positionSizingInputSchema,
 } from '../schemas.js';
 
 export interface RiskToolsDeps {
@@ -186,6 +192,59 @@ export function createRiskTools(deps: RiskToolsDeps) {
           defaultStopLossDescription: `Default stop loss at ${limits.defaultStopLossPercent}% below entry`,
           defaultTakeProfitPercent: `${limits.defaultTakeProfitPercent}%`,
           defaultTakeProfitDescription: `Default take profit at ${limits.defaultTakeProfitPercent}% above entry`,
+        };
+      },
+    }),
+
+    getPositionSizeRecommendation: tool({
+      description:
+        'Get recommended position size for a stock purchase. Returns how many shares you can safely buy based on risk limits, available cash, and current positions. Use this BEFORE buying to determine the right quantity.',
+      inputSchema: positionSizingInputSchema,
+      execute: async ({ symbol, estimatedPrice, strategy }) => {
+        Logger.info(
+          `${agentName} calculating position size for ${symbol} @ $${estimatedPrice}`
+        );
+
+        const portfolio = await getPortfolioData(accountService, agentName);
+
+        // Map strategy string to constant
+        const sizingStrategy: SizingStrategyValue =
+          strategy === 'conservative'
+            ? SIZING_STRATEGY.CONSERVATIVE
+            : strategy === 'max_allowed'
+              ? SIZING_STRATEGY.MAX_ALLOWED
+              : SIZING_STRATEGY.MODERATE;
+
+        const recommendation = riskService.suggestPositionSize(
+          symbol,
+          estimatedPrice,
+          portfolio,
+          sizingStrategy
+        );
+
+        return {
+          symbol: recommendation.symbol,
+          estimatedPrice: recommendation.estimatedPrice,
+          strategy: recommendation.strategy,
+          // Recommendations
+          recommendedShares: recommendation.recommendedShares,
+          recommendedValue: `$${recommendation.recommendedValue.toFixed(2)}`,
+          maxShares: recommendation.maxShares,
+          maxValue: `$${recommendation.maxValue.toFixed(2)}`,
+          // Current state
+          existingShares: recommendation.existingShares,
+          existingValue: `$${recommendation.existingValue.toFixed(2)}`,
+          // Projected outcome
+          postPurchaseShares: recommendation.postPurchaseShares,
+          postPurchaseValue: `$${recommendation.postPurchaseValue.toFixed(2)}`,
+          postPurchasePercent: `${recommendation.postPurchasePercent.toFixed(1)}%`,
+          // Analysis
+          limitingFactor: recommendation.limitingFactor,
+          riskLevel: recommendation.riskLevel,
+          canBuy: recommendation.canBuy,
+          reason: recommendation.reason,
+          constraints: recommendation.constraints,
+          warnings: recommendation.warnings,
         };
       },
     }),

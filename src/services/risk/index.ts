@@ -12,6 +12,11 @@ export { RiskService } from './RiskService.js';
 export { PositionRiskAnalyzer } from './PositionRiskAnalyzer.js';
 export { PortfolioRiskAnalyzer } from './PortfolioRiskAnalyzer.js';
 export { TradeRiskEvaluator } from './TradeRiskEvaluator.js';
+export {
+  PositionSizingCalculator,
+  SIZING_STRATEGY,
+  type SizingStrategyValue,
+} from './PositionSizingCalculator.js';
 
 // Re-export types and constants for consumers
 export * from './types.js';

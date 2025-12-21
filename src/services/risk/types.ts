@@ -117,6 +117,37 @@ export interface TradeRiskEvaluation {
 }
 
 // ═══════════════════════════════════════════════════════
+// POSITION SIZE RECOMMENDATION
+// ═══════════════════════════════════════════════════════
+
+export interface PositionSizeRecommendation {
+  symbol: string;
+  estimatedPrice: number;
+  strategy: string;
+  // Share recommendations
+  maxShares: number;
+  recommendedShares: number;
+  // Value recommendations
+  maxValue: number;
+  recommendedValue: number;
+  // Current state
+  existingShares: number;
+  existingValue: number;
+  // Post-purchase projections
+  postPurchaseShares: number;
+  postPurchaseValue: number;
+  postPurchasePercent: number;
+  // Analysis
+  limitingFactor: 'cash' | 'position_limit' | 'both';
+  riskLevel: RiskLevelValue;
+  constraints: string[];
+  warnings: string[];
+  // Summary
+  canBuy: boolean;
+  reason: string;
+}
+
+// ═══════════════════════════════════════════════════════
 // TYPE ALIASES FOR CONVENIENCE
 // ═══════════════════════════════════════════════════════
 

@@ -17,6 +17,11 @@ import { Logger } from '../../utils/logger.js';
 import { PositionRiskAnalyzer } from './PositionRiskAnalyzer.js';
 import { PortfolioRiskAnalyzer } from './PortfolioRiskAnalyzer.js';
 import { TradeRiskEvaluator } from './TradeRiskEvaluator.js';
+import {
+  PositionSizingCalculator,
+  type SizingStrategyValue,
+  SIZING_STRATEGY,
+} from './PositionSizingCalculator.js';
 
 // Constants
 import { DEFAULT_RISK_LIMITS } from './constants.js';
@@ -29,6 +34,7 @@ import type {
   PortfolioRisk,
   TradeRiskEvaluation,
   TradeTypeValue,
+  PositionSizeRecommendation,
 } from './types.js';
 
 export class RiskService {
@@ -36,6 +42,7 @@ export class RiskService {
   private readonly positionAnalyzer: PositionRiskAnalyzer;
   private readonly portfolioAnalyzer: PortfolioRiskAnalyzer;
   private readonly tradeEvaluator: TradeRiskEvaluator;
+  private readonly positionSizer: PositionSizingCalculator;
 
   // Current limits
   private limits: RiskLimits;
@@ -47,6 +54,7 @@ export class RiskService {
     this.positionAnalyzer = new PositionRiskAnalyzer(this.limits);
     this.portfolioAnalyzer = new PortfolioRiskAnalyzer(this.limits);
     this.tradeEvaluator = new TradeRiskEvaluator(this.limits);
+    this.positionSizer = new PositionSizingCalculator(this.limits);
 
     Logger.info('RiskService initialized');
   }
@@ -100,6 +108,31 @@ export class RiskService {
   }
 
   // ═══════════════════════════════════════════════════════
+  // PUBLIC API - Position Sizing
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Calculate recommended position size for a symbol
+   * @param symbol - Stock symbol to size
+   * @param estimatedPrice - Current/estimated price per share
+   * @param portfolio - Current portfolio state
+   * @param strategy - Sizing strategy (conservative, moderate, max_allowed)
+   */
+  suggestPositionSize(
+    symbol: string,
+    estimatedPrice: number,
+    portfolio: PortfolioData,
+    strategy: SizingStrategyValue = SIZING_STRATEGY.MODERATE
+  ): PositionSizeRecommendation {
+    return this.positionSizer.calculate(
+      symbol,
+      estimatedPrice,
+      portfolio,
+      strategy
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════
   // PUBLIC API - Risk Limits
   // ═══════════════════════════════════════════════════════
 
@@ -120,6 +153,7 @@ export class RiskService {
     this.positionAnalyzer.updateLimits(this.limits);
     this.portfolioAnalyzer.updateLimits(this.limits);
     this.tradeEvaluator.updateLimits(this.limits);
+    this.positionSizer.updateLimits(this.limits);
 
     Logger.info(`Risk limits updated: ${JSON.stringify(this.limits)}`);
     return this.getRiskLimits();

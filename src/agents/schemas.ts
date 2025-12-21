@@ -184,6 +184,23 @@ export const evaluateTradeRiskInputSchema = z.object({
     .describe('Estimated price per share for the trade'),
 });
 
+/** Position sizing recommendation input schema */
+export const positionSizingInputSchema = z.object({
+  symbol: symbolSchema.describe(
+    'Stock symbol to get sizing recommendation for'
+  ),
+  estimatedPrice: z
+    .number()
+    .positive()
+    .describe('Current or estimated price per share'),
+  strategy: z
+    .enum(['conservative', 'moderate', 'max_allowed'])
+    .optional()
+    .describe(
+      'Sizing strategy: conservative (50% of capacity), moderate (75%, default), or max_allowed (100%)'
+    ),
+});
+
 // ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
@@ -201,3 +218,4 @@ export type PositionRiskInput = z.infer<typeof positionRiskInputSchema>;
 export type EvaluateTradeRiskInput = z.infer<
   typeof evaluateTradeRiskInputSchema
 >;
+export type PositionSizingInput = z.infer<typeof positionSizingInputSchema>;
