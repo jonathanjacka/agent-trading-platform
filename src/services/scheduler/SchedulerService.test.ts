@@ -4,6 +4,7 @@ import {
   TradingOrchestratorService,
   SessionResult,
 } from '../orchestrator/index.js';
+import { DatabaseService } from '../database/index.js';
 
 // Mock the orchestrator
 const createMockOrchestrator = () =>
@@ -27,20 +28,31 @@ const createMockOrchestrator = () =>
       'donatello',
     ]),
     getDefaultPrompt: vi.fn((name: string) => `Prompt for ${name}`),
+    runSingleAgent: vi.fn().mockResolvedValue(undefined),
   }) as unknown as TradingOrchestratorService;
 
 describe('SchedulerService', () => {
   let scheduler: SchedulerService;
   let mockOrchestrator: TradingOrchestratorService;
+  let db: DatabaseService;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Reset DatabaseService singleton and use in-memory database
+    // @ts-ignore - accessing private static for testing
+    DatabaseService.instance = undefined;
+    db = DatabaseService.getInstance(':memory:');
+
     mockOrchestrator = createMockOrchestrator();
   });
 
   afterEach(() => {
     if (scheduler) {
       scheduler.stop();
+    }
+    if (db) {
+      db.close();
     }
   });
 
