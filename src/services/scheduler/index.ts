@@ -14,13 +14,15 @@
 import { Logger } from '../../utils/logger.js';
 import { TradingOrchestratorService } from '../orchestrator/index.js';
 import { MarketIntelligenceService } from '../marketIntelligence/index.js';
-import { MarketDataService } from '../MarketDataService.js';
+import { MarketDataService } from '../marketData/index.js';
 import { BraveSearchService } from '../BraveSearchService.js';
+import * as cron from 'node-cron';
 
 // Sub-modules
 import { JobManager } from './JobManager.js';
 import { DailyTradingJob } from './DailyTradingJob.js';
 import { IntradayTradingJob } from './IntradayTradingJob.js';
+import { StreamingJob } from './StreamingJob.js';
 
 // Re-export types for consumers
 export * from './types.js';
@@ -42,6 +44,11 @@ export class SchedulerService {
   private jobManager: JobManager;
   private dailyJob: DailyTradingJob;
   private intradayJob: IntradayTradingJob;
+  private streamingJob: StreamingJob;
+
+  // Streaming cron tasks
+  private streamingStartTask: ReturnType<typeof cron.schedule> | null = null;
+  private streamingStopTask: ReturnType<typeof cron.schedule> | null = null;
 
   constructor(
     orchestrator: TradingOrchestratorService,
@@ -57,6 +64,7 @@ export class SchedulerService {
         config.intradaySchedule ?? DEFAULT_CONFIG.intradaySchedule,
       timezone: config.timezone ?? DEFAULT_CONFIG.timezone,
       enableIntraday: config.enableIntraday ?? DEFAULT_CONFIG.enableIntraday,
+      enableStreaming: config.enableStreaming ?? DEFAULT_CONFIG.enableStreaming,
     };
     this.enabled = this.config.enabled;
 
@@ -77,6 +85,11 @@ export class SchedulerService {
       this.jobManager,
       this.marketIntelligence
     );
+    this.streamingJob = new StreamingJob(
+      orchestrator,
+      this.jobManager,
+      process.env.POLY_API_KEY || ''
+    );
 
     Logger.info(`SchedulerService initialized (enabled: ${this.enabled})`);
     Logger.info(
@@ -84,6 +97,9 @@ export class SchedulerService {
     );
     if (this.config.enableIntraday) {
       Logger.info(`Intraday schedule: ${this.config.intradaySchedule}`);
+    }
+    if (this.config.enableStreaming) {
+      Logger.info('Streaming job enabled');
     }
   }
 
@@ -110,6 +126,11 @@ export class SchedulerService {
       this.intradayJob.schedule(this.config.intradaySchedule);
     }
 
+    // Schedule streaming during market hours if enabled
+    if (this.config.enableStreaming) {
+      this.scheduleStreaming();
+    }
+
     Logger.success(
       `Scheduler started with ${this.jobManager.getActiveJobCount()} job(s)`
     );
@@ -120,6 +141,22 @@ export class SchedulerService {
    */
   stop(): void {
     Logger.section('Stopping Scheduler');
+
+    // Stop streaming if running
+    if (this.streamingJob.isRunning()) {
+      this.streamingJob.stop();
+    }
+
+    // Stop streaming cron tasks
+    if (this.streamingStartTask) {
+      this.streamingStartTask.stop();
+      this.streamingStartTask = null;
+    }
+    if (this.streamingStopTask) {
+      this.streamingStopTask.stop();
+      this.streamingStopTask = null;
+    }
+
     this.jobManager.stopAll();
     Logger.success('Scheduler stopped');
   }
@@ -155,6 +192,27 @@ export class SchedulerService {
    */
   triggerIntradayNow() {
     return this.intradayJob.trigger();
+  }
+
+  /**
+   * Manually start streaming
+   */
+  startStreaming(): void {
+    this.streamingJob.start();
+  }
+
+  /**
+   * Manually stop streaming
+   */
+  stopStreaming(): void {
+    this.streamingJob.stop();
+  }
+
+  /**
+   * Get streaming job status
+   */
+  getStreamingStats() {
+    return this.streamingJob.getStats();
   }
 
   // ═══════════════════════════════════════════════════════
@@ -207,5 +265,56 @@ export class SchedulerService {
    */
   getConfig(): SchedulerConfig {
     return { ...this.config };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // Private Helpers
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Schedule streaming to start/stop with market hours
+   * Market hours: 9:30 AM - 4:00 PM ET (Mon-Fri)
+   */
+  private scheduleStreaming(): void {
+    Logger.info('Scheduling streaming for market hours');
+
+    // Schedule start at 9:30 AM ET (14:30 UTC in winter, 13:30 UTC in summer)
+    // Using 9:30 AM in America/New_York timezone
+    this.streamingStartTask = cron.schedule(
+      '30 9 * * 1-5',
+      () => {
+        Logger.info('Market opening - starting streaming');
+        this.streamingJob.start();
+      },
+      { timezone: 'America/New_York' }
+    );
+
+    // Schedule stop at 4:00 PM ET
+    this.streamingStopTask = cron.schedule(
+      '0 16 * * 1-5',
+      () => {
+        Logger.info('Market closing - stopping streaming');
+        this.streamingJob.stop();
+      },
+      { timezone: 'America/New_York' }
+    );
+
+    // If market is currently open, start streaming immediately
+    const now = new Date();
+    const nyTime = new Date(
+      now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+    );
+    const hour = nyTime.getHours();
+    const minute = nyTime.getMinutes();
+    const day = nyTime.getDay();
+
+    const isWeekday = day >= 1 && day <= 5;
+    const afterOpen = hour > 9 || (hour === 9 && minute >= 30);
+    const beforeClose = hour < 16;
+
+    if (isWeekday && afterOpen && beforeClose) {
+      Logger.info('Market is currently open - starting streaming now');
+      this.streamingJob.start();
+    }
   }
 }

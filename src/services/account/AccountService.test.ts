@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AccountService } from './index.js';
 import { DatabaseService } from '../database/index.js';
-import { MarketDataService } from '../MarketDataService.js';
+import { MarketDataService } from '../marketData/index.js';
 
 // Mock PushoverService
 vi.mock('../PushoverService.js', () => ({

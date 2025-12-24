@@ -4,7 +4,7 @@
  */
 
 import type { DatabaseService } from '../database/index.js';
-import type { MarketDataService } from '../MarketDataService.js';
+import type { MarketDataService } from '../marketData/index.js';
 import type { TradeLogService } from '../TradeLogService.js';
 import type { PushoverService } from '../PushoverService.js';
 import type { PortfolioManager } from './PortfolioManager.js';
@@ -23,7 +23,7 @@ export class TradeExecutor {
     private tradeLogService: TradeLogService,
     private pushoverService: PushoverService,
     private portfolioManager: PortfolioManager
-  ) {}
+  ) { }
 
   /**
    * Execute a buy order

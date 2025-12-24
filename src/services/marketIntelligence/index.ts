@@ -12,7 +12,7 @@
  */
 
 import { Logger } from '../../utils/logger.js';
-import { MarketDataService } from '../MarketDataService.js';
+import { MarketDataService } from '../marketData/index.js';
 import { BraveSearchService } from '../BraveSearchService.js';
 
 // Sub-services

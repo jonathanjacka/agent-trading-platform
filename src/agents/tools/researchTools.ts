@@ -5,7 +5,7 @@
 
 import { tool } from 'ai';
 import { Logger } from '../../utils/logger.js';
-import { MarketDataService } from '../../services/MarketDataService.js';
+import { MarketDataService } from '../../services/marketData/index.js';
 import { BraveSearchService } from '../../services/BraveSearchService.js';
 import {
   searchNewsInputSchema,

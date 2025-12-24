@@ -15,3 +15,15 @@ export {
   createAnalyticsTools,
   type AnalyticsToolsDeps,
 } from './analyticsTools.js';
+export {
+  createTechnicalTools,
+  type TechnicalToolsDeps,
+} from './technicalTools.js';
+export {
+  createConsultationTools,
+  type ConsultationToolsDeps,
+} from './consultationTools.js';
+export {
+  createWatchlistTools,
+  type WatchlistToolsDeps,
+} from './watchlistTools.js';

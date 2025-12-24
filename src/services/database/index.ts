@@ -75,6 +75,13 @@ export class DatabaseService {
     return DatabaseService.instance;
   }
 
+  /**
+   * Get the raw database instance for services that need direct access
+   */
+  public getDatabase(): Database.Database {
+    return this.db;
+  }
+
   // ============================================
   // Legacy methods for backwards compatibility
   // These delegate to the appropriate repositories
@@ -314,6 +321,8 @@ export class DatabaseService {
   }
 
   public resetDatabase(): void {
+    this.db.exec('DELETE FROM signal_history');
+    this.db.exec('DELETE FROM watchlist');
     this.db.exec('DELETE FROM scheduler_runs');
     this.db.exec('DELETE FROM collective_insights');
     this.db.exec('DELETE FROM agent_memory');

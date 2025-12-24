@@ -256,4 +256,38 @@ export class TradingOrchestratorService {
   getDefaultPrompt(agentName: string): string | undefined {
     return DAILY_PROMPTS[agentName.toLowerCase()];
   }
+
+  /**
+   * Run a single agent with a custom prompt
+   * Used for intraday/streaming trading triggers
+   */
+  async runSingleAgent(
+    agentName: string,
+    customPrompt: string,
+    dryRun: boolean = false
+  ): Promise<AgentResult | null> {
+    const trader = this.traders.get(agentName.toLowerCase());
+    if (!trader) {
+      Logger.error(`Agent not found: ${agentName}`);
+      return null;
+    }
+
+    Logger.section(`Intraday Trade: ${agentName}`);
+    Logger.info(`Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}`);
+
+    const result = await this.agentRunner.runAgent(
+      trader,
+      agentName,
+      customPrompt,
+      dryRun
+    );
+
+    if (result) {
+      Logger.info(
+        `${agentName} completed: ${result.success ? 'SUCCESS' : 'FAILED'}`
+      );
+    }
+
+    return result;
+  }
 }

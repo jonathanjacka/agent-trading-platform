@@ -12,7 +12,7 @@ import {
   notFoundHandler,
   setupProcessErrorHandlers,
 } from './middleware/index.js';
-import { MarketDataService } from './services/MarketDataService.js';
+import { MarketDataService } from './services/marketData/index.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
 import { DatabaseService } from './services/database/index.js';
 import { AccountService } from './services/account/index.js';
@@ -178,6 +178,7 @@ const scheduler = new SchedulerService(
     intradaySchedule: process.env.INTRADAY_SCHEDULE || '30 10,14 * * 1-5', // Default: 10:30 AM, 2:30 PM ET
     timezone: process.env.SCHEDULER_TIMEZONE || 'UTC',
     enableIntraday: process.env.ENABLE_INTRADAY === 'true',
+    enableStreaming: process.env.ENABLE_STREAMING === 'true',
   },
   marketData, // Pass for market intelligence
   braveSearch // Pass for market intelligence

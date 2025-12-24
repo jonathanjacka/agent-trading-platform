@@ -221,6 +221,92 @@ export const performanceSummaryInputSchema = z.object({
 });
 
 // ============================================================================
+// Technical Analysis Schemas
+// ============================================================================
+
+/** Technical indicators input schema */
+export const technicalIndicatorInputSchema = z.object({
+  symbol: symbolSchema,
+  indicators: z
+    .array(z.enum(['SMA', 'EMA', 'RSI', 'MACD']))
+    .describe('Technical indicators to retrieve (e.g., ["RSI", "SMA"])'),
+  window: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Period window for indicators (default: 14 for RSI, 20 for SMA/EMA)'),
+});
+
+/** Quote/snapshot input schema */
+export const quoteInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock ticker symbol to get current quote for'),
+});
+
+/** Dividend history input schema */
+export const dividendInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock ticker symbol to get dividend history for'),
+  limit: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Number of dividend records to retrieve (default: 10)'),
+});
+
+// ============================================================================
+// Consultation Schemas
+// ============================================================================
+
+/** Consult expert (Claude) input schema */
+export const consultExpertInputSchema = z.object({
+  symbol: symbolSchema,
+  action: z.enum(['BUY', 'SELL', 'HOLD']).describe('Proposed trading action'),
+  quantity: z.number().positive().optional().describe('Number of shares'),
+  price: z.number().positive().optional().describe('Estimated price per share'),
+  reasoning: z.string().describe('Your reasoning for this trade decision'),
+  concerns: z
+    .string()
+    .optional()
+    .describe('Any concerns or uncertainties you have about this trade'),
+});
+
+/** Peer consensus input schema */
+export const peerConsensusInputSchema = z.object({
+  symbol: symbolSchema,
+  action: z.enum(['BUY', 'SELL']).describe('Proposed trading action'),
+  reasoning: z.string().describe('Brief explanation of why you want peer input'),
+});
+
+// ============================================================================
+// Watchlist Management Schemas
+// ============================================================================
+
+/** Add to watchlist input schema */
+export const addToWatchlistInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock ticker symbol to add to watchlist'),
+  reason: z.string().describe('Why you want to monitor this stock'),
+  durationDays: z
+    .number()
+    .positive()
+    .max(30)
+    .optional()
+    .default(7)
+    .describe('How long to watch this stock (1-30 days, default 7)'),
+});
+
+/** Remove from watchlist input schema */
+export const removeFromWatchlistInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock ticker symbol to remove from watchlist'),
+});
+
+/** Get watchlist input schema */
+export const getWatchlistInputSchema = z.object({
+  includeStats: z
+    .boolean()
+    .optional()
+    .describe('Whether to include watchlist statistics'),
+});
+
+// ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
 
@@ -241,3 +327,16 @@ export type PositionSizingInput = z.infer<typeof positionSizingInputSchema>;
 export type PerformanceSummaryInput = z.infer<
   typeof performanceSummaryInputSchema
 >;
+export type TechnicalIndicatorInput = z.infer<
+  typeof technicalIndicatorInputSchema
+>;
+export type QuoteInput = z.infer<typeof quoteInputSchema>;
+export type DividendInput = z.infer<typeof dividendInputSchema>;
+export type ConsultExpertInput = z.infer<typeof consultExpertInputSchema>;
+export type PeerConsensusInput = z.infer<typeof peerConsensusInputSchema>;
+export type AddToWatchlistInput = z.infer<typeof addToWatchlistInputSchema>;
+export type RemoveFromWatchlistInput = z.infer<
+  typeof removeFromWatchlistInputSchema
+>;
+export type GetWatchlistInput = z.infer<typeof getWatchlistInputSchema>;
+

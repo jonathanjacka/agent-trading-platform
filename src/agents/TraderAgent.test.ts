@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TraderAgent } from '../agents/TraderAgent.js';
 import { AccountService } from '../services/account/index.js';
-import { MarketDataService } from '../services/MarketDataService.js';
+import { MarketDataService } from '../services/marketData/index.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
 import { DatabaseService } from '../services/database/index.js';
 import { MemoryService } from '../services/memory/index.js';
