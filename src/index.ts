@@ -178,6 +178,7 @@ const scheduler = new SchedulerService(
     intradaySchedule: process.env.INTRADAY_SCHEDULE || '30 10,14 * * 1-5', // Default: 10:30 AM, 2:30 PM ET
     timezone: process.env.SCHEDULER_TIMEZONE || 'UTC',
     enableIntraday: process.env.ENABLE_INTRADAY === 'true',
+    enableStreaming: process.env.ENABLE_STREAMING === 'true',
   },
   marketData, // Pass for market intelligence
   braveSearch // Pass for market intelligence

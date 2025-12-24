@@ -27,6 +27,7 @@ export interface SchedulerConfig {
   intradaySchedule?: string;
   timezone?: string;
   enableIntraday?: boolean;
+  enableStreaming?: boolean;
 }
 
 export interface RequiredSchedulerConfig {
@@ -35,6 +36,7 @@ export interface RequiredSchedulerConfig {
   intradaySchedule: string;
   timezone: string;
   enableIntraday: boolean;
+  enableStreaming: boolean;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -70,14 +72,17 @@ export const DEFAULT_CONFIG: RequiredSchedulerConfig = {
   intradaySchedule: '30 10,14 * * 1-5', // 10:30 AM, 2:30 PM ET
   timezone: 'UTC',
   enableIntraday: false,
+  enableStreaming: false,
 };
 
 export const JOB_NAMES = {
   DAILY_TRADING: 'daily-trading',
   INTRADAY_TRADING: 'intraday-trading',
+  STREAMING: 'streaming-trading',
 } as const;
 
 export const TIMEZONES = {
   UTC: 'UTC',
   EASTERN: 'America/New_York',
 } as const;
+
