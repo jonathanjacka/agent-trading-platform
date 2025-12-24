@@ -17,6 +17,8 @@ export const standardLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Disable validation for Railway deployment - service is behind proxy which normalizes IPs
+  validate: { xForwardedForHeader: false },
   // Skip rate limiting for health checks
   skip: (req) => req.path === '/health' || req.path === '/api/health',
   // Use X-Forwarded-For header when behind proxy
@@ -51,6 +53,8 @@ export const strictLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Disable validation for Railway deployment - service is behind proxy which normalizes IPs
+  validate: { xForwardedForHeader: false },
   keyGenerator: (req) => {
     const forwarded = req.headers['x-forwarded-for'];
     const realIp = Array.isArray(forwarded)
@@ -69,3 +73,4 @@ export const strictLimiter = rateLimit({
     res.status(429).json(options.message);
   },
 });
+

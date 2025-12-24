@@ -18,6 +18,8 @@ import { SessionNotifier } from './SessionNotifier.js';
 import { generateSessionId, sleep } from './utils.js';
 import { MemoryService } from '../memory/index.js';
 import { DatabaseService } from '../database/index.js';
+import { AccountService } from '../account/index.js';
+import { MarketDataService } from '../marketData/index.js';
 import { Logger } from '../../utils/logger.js';
 
 // Re-export types for convenience
@@ -27,12 +29,16 @@ export { DAILY_PROMPTS } from './constants.js';
 export class TradingOrchestratorService {
   private memoryService: MemoryService;
   private db: DatabaseService;
+  private accountService: AccountService;
   private agentRunner: AgentRunner;
   private notifier: SessionNotifier;
 
   constructor(private traders: Map<string, TraderAgent>) {
     this.memoryService = MemoryService.getInstance();
     this.db = DatabaseService.getInstance();
+    const apiKey = process.env.POLY_API_KEY || '';
+    const marketData = new MarketDataService(apiKey);
+    this.accountService = new AccountService(this.db, marketData);
     this.agentRunner = new AgentRunner();
     this.notifier = new SessionNotifier();
   }
@@ -90,6 +96,21 @@ export class TradingOrchestratorService {
           `Waiting ${delayBetweenAgentsMs / 1000}s before next agent...`
         );
         await sleep(delayBetweenAgentsMs);
+      }
+    }
+
+    // Record portfolio snapshots for all agents at end of session
+    // This ensures we capture portfolio state even if individual snapshot calls fail
+    if (!dryRun) {
+      Logger.info('Recording end-of-session portfolio snapshots...');
+      for (const agentName of agents) {
+        try {
+          await this.accountService.recordPortfolioSnapshot(
+            agentName.charAt(0).toUpperCase() + agentName.slice(1).toLowerCase()
+          );
+        } catch (error) {
+          Logger.warn(`Failed to record snapshot for ${agentName}: ${error instanceof Error ? error.message : 'Unknown'}`);
+        }
       }
     }
 
@@ -286,6 +307,17 @@ export class TradingOrchestratorService {
       Logger.info(
         `${agentName} completed: ${result.success ? 'SUCCESS' : 'FAILED'}`
       );
+
+      // Record portfolio snapshot after single agent run
+      if (!dryRun) {
+        try {
+          await this.accountService.recordPortfolioSnapshot(
+            agentName.charAt(0).toUpperCase() + agentName.slice(1).toLowerCase()
+          );
+        } catch (error) {
+          Logger.warn(`Failed to record snapshot for ${agentName}: ${error instanceof Error ? error.message : 'Unknown'}`);
+        }
+      }
     }
 
     return result;

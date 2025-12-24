@@ -153,9 +153,6 @@ describe('TraderAgent Tools', () => {
       };
 
       mockAccountService.buyStock = vi.fn().mockResolvedValue(mockBuyResult);
-      mockAccountService.recordPortfolioSnapshot = vi
-        .fn()
-        .mockResolvedValue(undefined);
 
       // Act
       const tools = (traderAgent as any).getTools();
@@ -173,9 +170,7 @@ describe('TraderAgent Tools', () => {
         'Strong fundamentals',
         undefined // currentPrompt
       );
-      expect(mockAccountService.recordPortfolioSnapshot).toHaveBeenCalledWith(
-        'TestTrader'
-      );
+      // Note: Portfolio snapshots are now recorded at session end by orchestrator
       expect(result.success).toBe(true);
     });
 
@@ -219,9 +214,6 @@ describe('TraderAgent Tools', () => {
       };
 
       mockAccountService.sellStock = vi.fn().mockResolvedValue(mockSellResult);
-      mockAccountService.recordPortfolioSnapshot = vi
-        .fn()
-        .mockResolvedValue(undefined);
 
       // Act
       const tools = (traderAgent as any).getTools();
@@ -239,9 +231,7 @@ describe('TraderAgent Tools', () => {
         'Taking profits',
         undefined
       );
-      expect(mockAccountService.recordPortfolioSnapshot).toHaveBeenCalledWith(
-        'TestTrader'
-      );
+      // Note: Portfolio snapshots are now recorded at session end by orchestrator
       expect(result.success).toBe(true);
     });
 

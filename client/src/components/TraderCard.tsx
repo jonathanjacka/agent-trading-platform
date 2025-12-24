@@ -10,7 +10,6 @@ import { PortfolioSummary } from './PortfolioSummary';
 import { PortfolioHistorySection } from './PortfolioHistorySection';
 import { HoldingsSection } from './HoldingsSection';
 import { TransactionsSection } from './TransactionsSection';
-import { TradeSection } from './TradeSection';
 import { TradeLogsTable } from './TradeLogsTable';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { useState } from 'react';
@@ -211,8 +210,6 @@ export const TraderCard = ({ traderName, strategy }: TraderCardProps) => {
           />
         )}
       </div>
-
-      <TradeSection traderName={traderName} />
     </div>
   );
 };
