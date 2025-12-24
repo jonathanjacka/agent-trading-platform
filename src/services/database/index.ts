@@ -75,6 +75,13 @@ export class DatabaseService {
     return DatabaseService.instance;
   }
 
+  /**
+   * Get the raw database instance for services that need direct access
+   */
+  public getDatabase(): Database.Database {
+    return this.db;
+  }
+
   // ============================================
   // Legacy methods for backwards compatibility
   // These delegate to the appropriate repositories

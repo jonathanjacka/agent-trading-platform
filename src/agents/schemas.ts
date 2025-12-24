@@ -277,6 +277,36 @@ export const peerConsensusInputSchema = z.object({
 });
 
 // ============================================================================
+// Watchlist Management Schemas
+// ============================================================================
+
+/** Add to watchlist input schema */
+export const addToWatchlistInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock ticker symbol to add to watchlist'),
+  reason: z.string().describe('Why you want to monitor this stock'),
+  durationDays: z
+    .number()
+    .positive()
+    .max(30)
+    .optional()
+    .default(7)
+    .describe('How long to watch this stock (1-30 days, default 7)'),
+});
+
+/** Remove from watchlist input schema */
+export const removeFromWatchlistInputSchema = z.object({
+  symbol: symbolSchema.describe('Stock ticker symbol to remove from watchlist'),
+});
+
+/** Get watchlist input schema */
+export const getWatchlistInputSchema = z.object({
+  includeStats: z
+    .boolean()
+    .optional()
+    .describe('Whether to include watchlist statistics'),
+});
+
+// ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
 
@@ -304,3 +334,9 @@ export type QuoteInput = z.infer<typeof quoteInputSchema>;
 export type DividendInput = z.infer<typeof dividendInputSchema>;
 export type ConsultExpertInput = z.infer<typeof consultExpertInputSchema>;
 export type PeerConsensusInput = z.infer<typeof peerConsensusInputSchema>;
+export type AddToWatchlistInput = z.infer<typeof addToWatchlistInputSchema>;
+export type RemoveFromWatchlistInput = z.infer<
+  typeof removeFromWatchlistInputSchema
+>;
+export type GetWatchlistInput = z.infer<typeof getWatchlistInputSchema>;
+

@@ -23,3 +23,7 @@ export {
   createConsultationTools,
   type ConsultationToolsDeps,
 } from './consultationTools.js';
+export {
+  createWatchlistTools,
+  type WatchlistToolsDeps,
+} from './watchlistTools.js';

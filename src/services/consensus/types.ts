@@ -2,6 +2,9 @@
  * Consensus Service Types
  */
 
+/** Names of the trading agents */
+export type AgentName = 'leonardo' | 'michelangelo' | 'raphael' | 'donatello';
+
 export interface ConsensusRequest {
   symbol: string;
   action: 'BUY' | 'SELL';

@@ -26,7 +26,9 @@ import {
   createAnalyticsTools,
   createTechnicalTools,
   createConsultationTools,
+  createWatchlistTools,
 } from './tools/index.js';
+import { WatchlistService } from '../services/watchlist/index.js';
 
 const TRADER_BASE_INSTRUCTIONS = `Your responsibilities:
 - Analyze market conditions using available research tools
@@ -72,6 +74,11 @@ CONSULTATION (Second Opinions):
 - consultExpert: Get a second opinion from a senior investment consultant (Claude AI)
 - requestPeerConsensus: Ask your peer agents to vote on a proposed trade
 
+WATCHLIST MANAGEMENT:
+- addToWatchlist: Add a stock to real-time monitoring for trading opportunities
+- removeFromWatchlist: Remove a stock from your watchlist
+- getWatchlist: View all stocks you are currently monitoring
+
 Risk Management Guidelines:
 1. ALWAYS use evaluateTradeRisk before executing buyStock or sellStock
 2. Do not proceed with trades that have blockers
@@ -112,6 +119,7 @@ export class TraderAgent {
   private analyticsService: PerformanceAnalyticsService;
   private consultantAgent: ConsultantAgent;
   private consensusService: ConsensusService;
+  private watchlistService: WatchlistService;
   private currentPrompt: string | undefined;
 
   constructor(
@@ -147,6 +155,9 @@ export class TraderAgent {
     // Initialize consultation services
     this.consultantAgent = new ConsultantAgent();
     this.consensusService = new ConsensusService(modelName);
+
+    // Initialize watchlist service
+    this.watchlistService = new WatchlistService(db.getDatabase());
   }
 
   private getInstructions(): string {
@@ -200,6 +211,11 @@ Current datetime: ${new Date().toISOString()}`;
       agentName: this.name,
     });
 
+    const watchlistTools = createWatchlistTools({
+      watchlistService: this.watchlistService,
+      agentName: this.name,
+    });
+
     return {
       researcher: this.researcherAgent.getAsTool(),
       ...tradingTools,
@@ -209,6 +225,7 @@ Current datetime: ${new Date().toISOString()}`;
       ...analyticsTools,
       ...technicalTools,
       ...consultationTools,
+      ...watchlistTools,
     };
   }
 

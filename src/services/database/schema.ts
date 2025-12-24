@@ -210,4 +210,61 @@ export function initializeTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_scheduler_runs_status 
     ON scheduler_runs(status)
   `);
+
+  // Watchlist table - for agent-managed symbol monitoring
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS watchlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      added_by TEXT NOT NULL,
+      reason TEXT,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT,
+      active BOOLEAN NOT NULL DEFAULT 1,
+      UNIQUE(symbol, added_by)
+    )
+  `);
+
+  // Create indexes for watchlist
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_watchlist_symbol 
+    ON watchlist(symbol)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_watchlist_active 
+    ON watchlist(active)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_watchlist_expires 
+    ON watchlist(expires_at)
+  `);
+
+  // Signal history table - for logging detected trading signals
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS signal_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      signal_type TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      target_agent TEXT,
+      triggered BOOLEAN NOT NULL,
+      trigger_reason TEXT,
+      detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      data_snapshot TEXT
+    )
+  `);
+
+  // Create indexes for signal_history
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_signal_history_symbol 
+    ON signal_history(symbol)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_signal_history_detected 
+    ON signal_history(detected_at DESC)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_signal_history_type 
+    ON signal_history(signal_type)
+  `);
 }
