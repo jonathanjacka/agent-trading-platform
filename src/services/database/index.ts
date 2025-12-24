@@ -321,6 +321,8 @@ export class DatabaseService {
   }
 
   public resetDatabase(): void {
+    this.db.exec('DELETE FROM signal_history');
+    this.db.exec('DELETE FROM watchlist');
     this.db.exec('DELETE FROM scheduler_runs');
     this.db.exec('DELETE FROM collective_insights');
     this.db.exec('DELETE FROM agent_memory');
