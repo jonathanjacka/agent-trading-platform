@@ -155,9 +155,7 @@ describe('Agent Workflow Tests', () => {
         'Value opportunity',
         undefined
       );
-      expect(mockAccountService.recordPortfolioSnapshot).toHaveBeenCalledWith(
-        'Leonardo'
-      );
+      // Note: Portfolio snapshots are now recorded at session end by orchestrator
       expect(buyResult.success).toBe(true);
     });
 
@@ -178,9 +176,7 @@ describe('Agent Workflow Tests', () => {
         'Taking profits',
         undefined
       );
-      expect(mockAccountService.recordPortfolioSnapshot).toHaveBeenCalledWith(
-        'Leonardo'
-      );
+      // Note: Portfolio snapshots are now recorded at session end by orchestrator
       expect(sellResult.success).toBe(true);
     });
 

@@ -64,8 +64,6 @@ export function createTradingTools(deps: TradingToolsDeps) {
 
         if (!result.success) {
           Logger.warn(`Buy order failed: ${result.message}`);
-        } else {
-          await accountService.recordPortfolioSnapshot(agentName);
         }
 
         return result;
@@ -87,8 +85,6 @@ export function createTradingTools(deps: TradingToolsDeps) {
 
         if (!result.success) {
           Logger.warn(`Sell order failed: ${result.message}`);
-        } else {
-          await accountService.recordPortfolioSnapshot(agentName);
         }
 
         return result;
