@@ -4,6 +4,9 @@ import { TraderAgent } from '../../agents/TraderAgent.js';
 import { DatabaseService } from '../database/index.js';
 import { MemoryService } from '../memory/index.js';
 
+// Set env var for MarketDataService (used by AccountService in orchestrator)
+process.env.POLY_API_KEY = 'test-api-key';
+
 // Mock TraderAgent
 const createMockTrader = (name: string, shouldFail = false) => {
   return {
