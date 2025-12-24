@@ -15,7 +15,7 @@
  */
 
 import { DatabaseService } from '../database/index.js';
-import { MarketDataService } from '../MarketDataService.js';
+import { MarketDataService } from '../marketData/index.js';
 import { TradeLogService } from '../TradeLogService.js';
 import { PushoverService } from '../PushoverService.js';
 import { PortfolioManager } from './PortfolioManager.js';

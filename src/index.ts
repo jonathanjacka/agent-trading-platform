@@ -12,7 +12,7 @@ import {
   notFoundHandler,
   setupProcessErrorHandlers,
 } from './middleware/index.js';
-import { MarketDataService } from './services/MarketDataService.js';
+import { MarketDataService } from './services/marketData/index.js';
 import { BraveSearchService } from './services/BraveSearchService.js';
 import { DatabaseService } from './services/database/index.js';
 import { AccountService } from './services/account/index.js';

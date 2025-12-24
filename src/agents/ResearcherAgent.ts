@@ -7,7 +7,7 @@ import { generateText, tool, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { openai } from '@ai-sdk/openai';
 import { Logger } from '../utils/logger.js';
-import { MarketDataService } from '../services/MarketDataService.js';
+import { MarketDataService } from '../services/marketData/index.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
 import { createResearchTools } from './tools/index.js';
 

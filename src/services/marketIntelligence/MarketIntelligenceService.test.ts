@@ -3,7 +3,7 @@ import { MarketIntelligenceService } from './index.js';
 import { MarketConditionsService } from './MarketConditionsService.js';
 import { StockDiscoveryService } from './StockDiscoveryService.js';
 import { MarketMoversService } from './MarketMoversService.js';
-import { MarketDataService } from '../MarketDataService.js';
+import { MarketDataService } from '../marketData/index.js';
 import { BraveSearchService } from '../BraveSearchService.js';
 import { MARKET_STATUS, SENTIMENT, VOLATILITY } from './constants.js';
 

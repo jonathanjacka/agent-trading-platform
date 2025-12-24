@@ -45,6 +45,7 @@
   },
   "homepage": "https://github.com/jonathanjacka/agent-trading-platform#readme",
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.1",
     "@ai-sdk/openai": "^2.0.65",
     "@langfuse/otel": "^4.5.1",
     "@langfuse/tracing": "^4.5.1",

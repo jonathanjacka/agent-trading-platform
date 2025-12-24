@@ -4,14 +4,14 @@
  */
 
 import type { DatabaseService } from '../database/index.js';
-import type { MarketDataService } from '../MarketDataService.js';
+import type { MarketDataService } from '../marketData/index.js';
 import type { PortfolioSummary, HoldingWithPrice } from './types.js';
 
 export class PortfolioManager {
   constructor(
     private db: DatabaseService,
     private marketData: MarketDataService
-  ) {}
+  ) { }
 
   /**
    * Get complete portfolio summary with current market prices

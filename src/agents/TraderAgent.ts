@@ -6,8 +6,9 @@
 import { generateText, stepCountIs } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { ResearcherAgent } from './ResearcherAgent.js';
+import { ConsultantAgent } from './ConsultantAgent.js';
 import { Logger } from '../utils/logger.js';
-import { MarketDataService } from '../services/MarketDataService.js';
+import { MarketDataService } from '../services/marketData/index.js';
 import { BraveSearchService } from '../services/BraveSearchService.js';
 import { AccountService } from '../services/account/index.js';
 import { MemoryService } from '../services/memory/index.js';
@@ -16,12 +17,15 @@ import { RiskService } from '../services/risk/index.js';
 import { PerformanceAnalyticsService } from '../services/analytics/index.js';
 import { TradeLogService } from '../services/TradeLogService.js';
 import { DatabaseService } from '../services/database/index.js';
+import { ConsensusService } from '../services/consensus/index.js';
 import {
   createTradingTools,
   createMarketTools,
   createMemoryTools,
   createRiskTools,
   createAnalyticsTools,
+  createTechnicalTools,
+  createConsultationTools,
 } from './tools/index.js';
 
 const TRADER_BASE_INSTRUCTIONS = `Your responsibilities:
@@ -37,6 +41,11 @@ RESEARCH & DISCOVERY:
 - getMarketOverview: Get real-time market status, sentiment, and top movers
 - discoverStocks: Find new investment opportunities by theme (AI, EVs, etc.) or trending
 - getMarketMovers: Get today's top gainers and losers
+
+TECHNICAL ANALYSIS:
+- getTechnicalIndicators: Get RSI, SMA, EMA, MACD for a stock
+- getQuote: Get current price and daily statistics
+- getDividendHistory: Get dividend payment history and yield
 
 TRADING:
 - getPortfolio: Check current holdings and cash balance
@@ -59,6 +68,10 @@ MEMORY & LEARNING:
 - reviewCollectiveLessons: Learn from insights discovered by other agents
 - recordLesson: Manually record an important insight or lesson
 
+CONSULTATION (Second Opinions):
+- consultExpert: Get a second opinion from a senior investment consultant (Claude AI)
+- requestPeerConsensus: Ask your peer agents to vote on a proposed trade
+
 Risk Management Guidelines:
 1. ALWAYS use evaluateTradeRisk before executing buyStock or sellStock
 2. Do not proceed with trades that have blockers
@@ -77,12 +90,14 @@ Trading Guidelines:
 1. Start by checking getMarketOverview to understand current conditions
 2. Check getPortfolioRisk to assess current risk exposure
 3. Use discoverStocks to find opportunities beyond your training data
-4. Always research before making trading decisions
-5. Consider your strategy when evaluating opportunities
-6. Review your memories and collective lessons to learn from past experiences
-7. Record important insights when you discover patterns or lessons
-8. Explain your reasoning clearly
-9. Be decisive but not reckless`;
+4. Use getTechnicalIndicators for chart analysis (especially RSI, MACD)
+5. Always research before making trading decisions
+6. Consider your strategy when evaluating opportunities
+7. Review your memories and collective lessons to learn from past experiences
+8. Record important insights when you discover patterns or lessons
+9. For significant trades, consider using consultExpert or requestPeerConsensus
+10. Explain your reasoning clearly
+11. Be decisive but not reckless`;
 
 export class TraderAgent {
   private modelName: string;
@@ -92,8 +107,11 @@ export class TraderAgent {
   private accountService: AccountService;
   private memoryService: MemoryService;
   private marketIntelligence: MarketIntelligenceService;
+  private marketData: MarketDataService;
   private riskService: RiskService;
   private analyticsService: PerformanceAnalyticsService;
+  private consultantAgent: ConsultantAgent;
+  private consensusService: ConsensusService;
   private currentPrompt: string | undefined;
 
   constructor(
@@ -108,6 +126,7 @@ export class TraderAgent {
     this.strategy = strategy;
     this.modelName = modelName;
     this.accountService = accountService;
+    this.marketData = marketData;
     this.memoryService = MemoryService.getInstance();
     this.riskService = new RiskService();
     this.marketIntelligence = new MarketIntelligenceService(
@@ -124,6 +143,10 @@ export class TraderAgent {
     const db = DatabaseService.getInstance();
     const tradeLogService = new TradeLogService(db);
     this.analyticsService = new PerformanceAnalyticsService(tradeLogService);
+
+    // Initialize consultation services
+    this.consultantAgent = new ConsultantAgent();
+    this.consensusService = new ConsensusService(modelName);
   }
 
   private getInstructions(): string {
@@ -166,6 +189,17 @@ Current datetime: ${new Date().toISOString()}`;
       agentName: this.name,
     });
 
+    const technicalTools = createTechnicalTools({
+      marketData: this.marketData,
+      agentName: this.name,
+    });
+
+    const consultationTools = createConsultationTools({
+      consultantAgent: this.consultantAgent,
+      consensusService: this.consensusService,
+      agentName: this.name,
+    });
+
     return {
       researcher: this.researcherAgent.getAsTool(),
       ...tradingTools,
@@ -173,6 +207,8 @@ Current datetime: ${new Date().toISOString()}`;
       ...memoryTools,
       ...riskTools,
       ...analyticsTools,
+      ...technicalTools,
+      ...consultationTools,
     };
   }
 

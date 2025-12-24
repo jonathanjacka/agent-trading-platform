@@ -14,7 +14,7 @@
 import { Logger } from '../../utils/logger.js';
 import { TradingOrchestratorService } from '../orchestrator/index.js';
 import { MarketIntelligenceService } from '../marketIntelligence/index.js';
-import { MarketDataService } from '../MarketDataService.js';
+import { MarketDataService } from '../marketData/index.js';
 import { BraveSearchService } from '../BraveSearchService.js';
 
 // Sub-modules
