@@ -21,7 +21,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test-api": "bash test-api.sh"
+    "test-api": "bash test-api.sh",
+    "check:streaming": "tsx scripts/check-streaming.ts"
   },
   "imports": {
     "#/*": "./src/*",
